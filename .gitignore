@@ -1,0 +1,22 @@
+# Secrets
+.env
+.env.*
+!.env.example
+*.key
+
+# Local data (large or licensed files stay out of git)
+*.duckdb
+*.duckdb.wal
+data/raw/
+data/cache/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# System
+.DS_Store
+Thumbs.db

@@ -1,6 +1,6 @@
 # Methodology
 
-**Version 0.1 (draft)** · Status: awaiting Lucas's review · Owner: Lucas
+**Version 0.2** · Status: approved by Lucas (open decisions settled 17 Sep 2026) · Owner: Lucas
 
 This document defines how the company measures, compares and publishes investment returns. Every agent works from it. If a result can't be produced within these rules, it isn't published.
 
@@ -120,7 +120,7 @@ Some assets are one price series (an index fund, gold). Others are many separate
 
 Every result is shown next to the same three benchmarks, over the same window, using the same method:
 
-1. **Global shares:** a low-cost global index tracker (specific fund to be chosen and recorded).
+1. **Global shares:** the S&P 500 as a total return index (dividends reinvested), converted to GBP at daily rates, with the costs of a typical low-cost UK-available S&P 500 tracker applied.
 2. **Cash:** an easy-access savings rate series.
 3. **Inflation:** so viewers can see whether money kept its buying power.
 
@@ -204,10 +204,14 @@ Corrections are logged, never silently edited, and listed on a public correction
 
 ---
 
-## Open decisions for Lucas
+## Decisions log
 
-1. **Default tax scenario for headlines:** Taxable (more realistic for physical assets) or Sheltered (more realistic for shares)? Proposal: Taxable for everything, with Sheltered shown alongside where it applies.
-2. **Inflation measure:** CPI (proposed) or CPIH (which includes housing costs)?
-3. **Standard end date:** month end (proposed) or quarter end?
-4. **Global shares benchmark:** which specific tracker fund to use as the standard.
-5. **Data threshold:** is 90% coverage per window the right bar?
+All settled by Lucas on 17 September 2026.
+
+| Decision | Outcome |
+|---|---|
+| Default tax scenario for headlines | Taxable, with Sheltered shown alongside where it applies. |
+| Inflation measure | CPI (Consumer Prices Index). |
+| Standard end date | Month end. |
+| Global shares benchmark | The S&P 500 as a total return index (dividends reinvested), converted to GBP at daily rates, with the costs of a typical low-cost UK-available S&P 500 tracker applied. |
+| Data threshold | 90% coverage per window is the minimum bar for publication. |

@@ -1,6 +1,6 @@
 # Methodology
 
-**Version 0.2** · Status: approved by Lucas (open decisions settled 17 Sep 2026) · Owner: Lucas
+**Version 0.3** · Status: approved by Lucas (open decisions settled 17 Sep 2026; citation rule added 18 Sep 2026) · Owner: Lucas
 
 This document defines how the company measures, compares and publishes investment returns. Every agent works from it. If a result can't be produced within these rules, it isn't published.
 
@@ -147,7 +147,12 @@ Rules:
 - All results are in GBP. Foreign prices are converted at the exchange rate on the transaction date.
 - Inflation uses the ONS Consumer Prices Index (CPI) throughout, for consistency.
 
-### 7.3 Missing and messy data
+### 7.3 Citations
+
+- Every citation must quote the exact sentence or clause being relied on, taken from the page, plus the date it was accessed. A citation that names only a page or document reference, with no quoted line, is not acceptable.
+- If the specific line supporting a claim cannot be found, the claim does not get cited as settled. It moves to Open Questions instead.
+
+### 7.4 Missing and messy data
 
 - Gaps longer than three months in a monthly series are not filled in. The affected windows are marked "insufficient data".
 - A window is only published if at least 90% of its expected data points exist.

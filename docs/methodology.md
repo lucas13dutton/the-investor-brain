@@ -1,6 +1,6 @@
 # Methodology
 
-**Version 0.3** · Status: approved by Lucas (open decisions settled 17 Sep 2026; citation rule added 18 Sep 2026) · Owner: Lucas
+**Version 0.4** · Status: approved by Lucas (open decisions settled 17 Sep 2026; citation rule and published-vs-interactive scale rule added 18 Sep 2026) · Owner: Lucas
 
 This document defines how the company measures, compares and publishes investment returns. Every agent works from it. If a result can't be produced within these rules, it isn't published.
 
@@ -102,6 +102,12 @@ To prevent cherry-picking dates:
 2. **Rolling windows:** for each window length, every possible start month in the data. Report the median, the worst and the best.
 3. **Event windows** (for example, "bought at the January 2026 gold record") are allowed for storytelling, but must be labelled as event windows and shown next to at least one standard window.
 4. The **end date** is fixed per publication cycle, so that every asset in one Everything Index update uses the same end date.
+
+### Published scale versus interactive comparison
+
+Published content always uses the standard fixed windows (1, 5, 10 and 20 years, all ending on the same stated month end) benchmarked against the S&P 500, so every asset is comparable with every other.
+
+The app additionally offers a user-chosen purchase date, comparing that asset against the S&P 500 from that date and against any other asset the user picks. A user-chosen date is an event window under the rules in this section: it must be labelled as chosen dates for illustration and shown alongside at least one standard window. It may never be used as a published headline.
 
 ---
 
@@ -211,12 +217,13 @@ Corrections are logged, never silently edited, and listed on a public correction
 
 ## Decisions log
 
-All settled by Lucas on 17 September 2026.
+Settled by Lucas.
 
-| Decision | Outcome |
-|---|---|
-| Default tax scenario for headlines | Taxable, with Sheltered shown alongside where it applies. |
-| Inflation measure | CPI (Consumer Prices Index). |
-| Standard end date | Month end. |
-| Global shares benchmark | The S&P 500 as a total return index (dividends reinvested), converted to GBP at daily rates, with the costs of a typical low-cost UK-available S&P 500 tracker applied. |
-| Data threshold | 90% coverage per window is the minimum bar for publication. |
+| Date | Decision | Outcome |
+|---|---|---|
+| 17 Sep 2026 | Default tax scenario for headlines | Taxable, with Sheltered shown alongside where it applies. |
+| 17 Sep 2026 | Inflation measure | CPI (Consumer Prices Index). |
+| 17 Sep 2026 | Standard end date | Month end. |
+| 17 Sep 2026 | Global shares benchmark | The S&P 500 as a total return index (dividends reinvested), converted to GBP at daily rates, with the costs of a typical low-cost UK-available S&P 500 tracker applied. |
+| 17 Sep 2026 | Data threshold | 90% coverage per window is the minimum bar for publication. |
+| 18 Sep 2026 | Published scale vs. interactive comparison | Published results use fixed windows; user-chosen purchase dates are an interactive app feature only. |

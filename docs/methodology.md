@@ -1,6 +1,6 @@
 # Methodology
 
-**Version 0.5** · Status: approved by Lucas (open decisions settled 17 Sep 2026; citation rule, published-vs-interactive scale rule and naming hierarchy added 18 Sep 2026) · Owner: Lucas
+**Version 0.6** · Status: approved by Lucas (open decisions settled 17 Sep 2026; citation rule, published-vs-interactive scale rule and naming hierarchy added 18 Sep 2026; benchmark implementation, unsourced-cost sensitivity rule and seller-research tier rule added 19 Sep 2026) · Owner: Lucas
 
 This document defines how the company measures, compares and publishes investment returns. Every agent works from it. If a result can't be produced within these rules, it isn't published.
 
@@ -83,6 +83,8 @@ Every cost has three values, each backed by a source:
 
 Every asset write-up fills in all of these lines. If a cost does not apply, write "none" and say why. A blank line blocks publication.
 
+**Where a cost cannot be sourced** despite a genuine attempt, it is not left blank and does not block publication. Instead it is published as a **labelled sensitivity**: the result is shown both with the cost excluded and with a stated upper bound applied, and that upper bound is explicitly labelled as an assumption, not a verified figure. An invented central figure is never used in its place.
+
 | Stage | Costs to include |
 |---|---|
 | Buying | Dealer premium or spread, commission, platform fees, stamp duty or VAT, buyer's premium, delivery, authentication or grading |
@@ -126,7 +128,7 @@ Some assets are one price series (an index fund, gold). Others are many separate
 
 Every result is shown next to the same three benchmarks, over the same window, using the same method:
 
-1. **Global shares:** the S&P 500 as a total return index (dividends reinvested), converted to GBP at daily rates, with the costs of a typical low-cost UK-available S&P 500 tracker applied.
+1. **Global shares:** the S&P 500 as a total return index (dividends reinvested), converted to GBP at daily rates, with the costs of a typical low-cost UK-available S&P 500 tracker applied. **Implementation (19 Sep 2026):** this is calculated from the NAV total return of a named low-cost, accumulating, UK-available S&P 500 tracker fund, cited to the fund issuer at Tier B — not from S&P Dow Jones Indices' own index series directly. This avoids needing a commercial index data licence. The S&P 500 index itself remains the conceptual reference for what the benchmark represents.
 2. **Cash:** an easy-access savings rate series.
 3. **Inflation:** so viewers can see whether money kept its buying power.
 
@@ -146,6 +148,7 @@ Rules:
 
 - **Asking prices are never treated as sale prices.**
 - A source written by someone selling the asset (a dealer, a platform, a tool vendor) is at most Tier C, unless it publishes its underlying data and method.
+- **Research published by a firm that sells investment or advisory services is Tier C by default.** Where it names a primary source and an as-of date, it may support a directional, non-headline claim, but never a headline number alone — and two such sources do not make each other independent.
 - Every source must be used within its licence terms. No scraping against a site's terms.
 
 ### 7.2 Currency and inflation
@@ -228,3 +231,6 @@ Settled by Lucas.
 | 17 Sep 2026 | Data threshold | 90% coverage per window is the minimum bar for publication. |
 | 18 Sep 2026 | Published scale vs. interactive comparison | Published results use fixed windows; user-chosen purchase dates are an interactive app feature only. |
 | 18 Sep 2026 | Naming hierarchy | Confirmed: Asset Theory (company, app, channels, subscription), Research (evidence library), Asset Autopsy (comparison feature and video series), Strategy Lab (strategy testing). |
+| 19 Sep 2026 | Global shares benchmark implementation | The benchmark is implemented as the NAV total return of a named low-cost, accumulating, UK-available S&P 500 tracker, cited to the issuer at Tier B, rather than S&P Dow Jones Indices' own index series directly. This avoids needing an index data licence. The index remains the conceptual reference. |
+| 19 Sep 2026 | Unsourced-cost sensitivity rule | Where a cost cannot be sourced, it is published as a labelled sensitivity showing the result with and without a stated upper bound, never as an invented central figure. Unsourced costs no longer block publication, provided the sensitivity and its label are shown. |
+| 19 Sep 2026 | Seller-research source tier rule | Research published by a firm that sells investment or advisory services is Tier C by default. Where it names a primary source and as-of date, it may support a directional, non-headline claim, but never a headline number alone, and two such sources do not make each other independent. |

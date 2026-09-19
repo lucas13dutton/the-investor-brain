@@ -128,3 +128,17 @@ Always goes to Lucas before anything is published or sent:
 - Any partnership, sponsorship or paid offer.
 - Any complaint, correction request or message from a regulator, lawyer or journalist.
 - Anything the Compliance agent marks "Escalate".
+
+---
+
+## Part 5: Tooling budget
+
+- **Monthly ceiling: £100.** Spending on tools, data subscriptions or services within this ceiling in a given month does not need Lucas's escalation.
+- **Anything that would take a month's spending above the ceiling** needs Lucas's sign-off before it's committed to.
+- **Any new recurring cost is recorded below**, whether or not it needed escalation, so the running total is always visible.
+
+### Recorded recurring costs
+
+| Cost | Amount | Started | Notes |
+|---|---|---|---|
+| _None yet_ | | | |

@@ -46,9 +46,9 @@ Each line below must appear **verbatim** — word for word, not paraphrased — 
 > This is research and education, not financial advice. What happened in the past doesn't tell you what happens next, and you can get back less than you put in.
 
 **3. Newsletter and website footer** — footer of every newsletter issue and every website page:
-> Assayer is a research and education publisher. Nothing here is financial advice or a recommendation to buy, sell or hold any investment. Past performance is not a guide to future performance. The value of investments can fall as well as rise, and you may get back less than you invested.
+> Asset Theory is a research and education publisher. Nothing here is financial advice or a recommendation to buy, sell or hold any investment. Past performance is not a guide to future performance. The value of investments can fall as well as rise, and you may get back less than you invested.
 
-"Assayer" is a provisional brand name pending the final name — update this line when the name is finalised.
+"Asset Theory" is the confirmed working name for the company, app, channels and subscription (see the "Naming" section in the root `README.md`), subject to trademark, company and domain checks — update this line if that changes.
 
 **4. App, on any comparison result** — attached to every comparison result shown:
 > Historical comparison only, after the costs shown. Different costs, dates or tax circumstances give different results.

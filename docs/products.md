@@ -1,12 +1,14 @@
 # Products
 
-**Status: draft specs. Neither product is built.** This document describes what each is intended to do, so that what gets built matches what the brain already promises in `docs/methodology.md` and `docs/house-rules.md`. Nothing here is a commitment to a build date.
+**Status: draft specs. None of the three is built.** This document describes what each is intended to do, so that what gets built matches what the brain already promises in `docs/methodology.md` and `docs/house-rules.md`. Nothing here is a commitment to a build date.
+
+These are three surfaces of the Asset Theory brand — see the "Naming" section in the root `README.md` for the full naming hierarchy.
 
 ---
 
-## Asset Theory
+## Research
 
-The research layer.
+The evidence library: studies, methods, sources, findings.
 
 ### What it does
 
@@ -29,7 +31,7 @@ Readers who want to understand *why* a result is what it is, not just see it —
 
 - A dossier passing skeptic review for at least one asset (done for gold; see `dossiers/gold.md` and its reviews).
 - The evidence log actually populated and passing `data/evidence/validate.py` for that asset's published claims — not just logged as draft.
-- A settled decision on which claims are cleared to publish (`approved_by` filled in), since Asset Theory is a publishing surface, not a research scratchpad.
+- A settled decision on which claims are cleared to publish (`approved_by` filled in), since this is a publishing surface, not a research scratchpad.
 - A stable page/URL structure per asset, so evidence-log links are durable.
 
 ### Compliance constraints
@@ -43,7 +45,7 @@ Readers who want to understand *why* a result is what it is, not just see it —
 
 ## Asset Autopsy
 
-The comparison layer.
+The comparison layer: "Compare assets."
 
 ### What it does
 
@@ -78,8 +80,42 @@ Anyone who wants to run their own "what if I'd bought X instead of Y" comparison
 - No signals: no alerts, no "buy now" styling, no notification that a comparison has moved in the user's favour.
 - Carries the app comparison risk line on every result, every time, per `docs/house-rules.md` mandatory risk lines.
 
+### Naming note
+
+Asset Autopsy is deliberately the name of both this feature and the short-form video series. The series functions as a preview and on-ramp for the tool, so the shared name is intentional, not a collision to resolve.
+
 ---
 
-## Open decision: name collision
+## Strategy Lab
 
-"Asset Autopsy" is currently also the name of the short-form video series. Before this product is built, Lucas needs to decide whether the series and the product deliberately share a name (the series functions as a preview/on-ramp for the tool, so shared branding could be intentional) or need separate names (to avoid confusion between "a video that autopsies one asset" and "a tool where you autopsy any comparison yourself"). Unresolved as of this document.
+The strategy testing layer.
+
+### What it does
+
+Runs pre-registered paper portfolios that test investing strategies against historical data, under the rules in `docs/methodology.md` section 9: rules, assets, start date and success test written down before testing; no look-ahead; tuned on one period and judged only on a later one it never saw; full costs applied at the central scenario on every trade; and a kill rule — a strategy that fails its pre-registered test is retired and reported, not tweaked until it passes. Results are always labelled as research on historical data, never as signals or a suggestion to act.
+
+### Who it's for
+
+Readers curious whether a mechanical strategy (e.g. rebalancing rules, trend rules, dollar-cost averaging variants) would actually have worked once costs are included — and, just as importantly, seeing the strategies that failed and were retired.
+
+### What it draws on
+
+| Part of the brain | How it's used |
+|---|---|
+| `dossiers/*.md` | The assets a strategy trades, and their price history. |
+| `costs/` | Full transaction costs (central scenario) applied to every simulated trade, per methodology section 9.5. |
+| `data/evidence/evidence.csv` | The price data and cost figures a strategy relies on must themselves be evidenced, same as any other published number. |
+| `lab/` | Where each strategy's pre-registration and results live — this product is the public-facing view onto that folder. |
+
+### What has to exist before it can be built
+
+- At least one strategy pre-registered and run through to a kept-or-killed verdict, with its pre-registration and results committed to `lab/` before any product view is built around it.
+- A settled convention for how a killed strategy is displayed (it must be shown, not quietly dropped, per the kill rule).
+- Skeptic review of the strategy's methodology and results, same bar as a dossier.
+
+### Compliance constraints
+
+- No recommendations: a strategy's historical result is never framed as "do this."
+- No personalised output: results are shown as run, not adjusted per viewer.
+- No signals: labelled as research on historical data on every view, never as a live or ongoing recommendation. Killed strategies stay visible, not hidden.
+- Carries the paper portfolio risk line on every output, every time, per `docs/house-rules.md` mandatory risk lines.

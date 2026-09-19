@@ -1,6 +1,6 @@
 # Methodology
 
-**Version 0.4** · Status: approved by Lucas (open decisions settled 17 Sep 2026; citation rule and published-vs-interactive scale rule added 18 Sep 2026) · Owner: Lucas
+**Version 0.5** · Status: approved by Lucas (open decisions settled 17 Sep 2026; citation rule, published-vs-interactive scale rule and naming hierarchy added 18 Sep 2026) · Owner: Lucas
 
 This document defines how the company measures, compares and publishes investment returns. Every agent works from it. If a result can't be produced within these rules, it isn't published.
 
@@ -227,3 +227,4 @@ Settled by Lucas.
 | 17 Sep 2026 | Global shares benchmark | The S&P 500 as a total return index (dividends reinvested), converted to GBP at daily rates, with the costs of a typical low-cost UK-available S&P 500 tracker applied. |
 | 17 Sep 2026 | Data threshold | 90% coverage per window is the minimum bar for publication. |
 | 18 Sep 2026 | Published scale vs. interactive comparison | Published results use fixed windows; user-chosen purchase dates are an interactive app feature only. |
+| 18 Sep 2026 | Naming hierarchy | Confirmed: Asset Theory (company, app, channels, subscription), Research (evidence library), Asset Autopsy (comparison feature and video series), Strategy Lab (strategy testing). |

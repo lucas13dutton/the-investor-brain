@@ -15,6 +15,17 @@ Private while the brand is being finalised.
 | `signal-room/` | Content research: watchlist, outlier scoring, teardowns, weekly brief | Planned |
 | `lab/` | Strategy Lab: pre-registered paper strategies and results | Planned |
 
+## Naming
+
+| Level | Name | Covers |
+|---|---|---|
+| Company, app, channels, subscription | Asset Theory | The overall brand across every surface. |
+| Evidence library | Research | Studies, methods, sources, findings. |
+| Comparison feature and video series | Asset Autopsy | "Compare assets" — the feature and the video series deliberately share this name. |
+| Strategy testing area | Strategy Lab | Pre-registered paper-portfolio testing, per `docs/methodology.md` section 9. |
+
+"Asset Theory" is the confirmed working name, subject to trademark, company and domain checks.
+
 ## Ground rules
 
 - Every published number has an entry in the evidence log. See `docs/methodology.md`.

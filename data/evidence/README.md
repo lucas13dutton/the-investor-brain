@@ -50,5 +50,20 @@ The log is `evidence.csv`, one row per claim.
 Per `docs/methodology.md` section 8: **every published number has an entry here, or it isn't published.** In practice that means:
 
 - A dossier can be well-sourced and skeptic-reviewed and still not be ready to publish from, if its numbers haven't been logged here yet.
-- A row with `status: draft` is not cleared for publication — only `live` or `corrected` rows, which require `approved_by` to be filled in, represent something Lucas has actually signed off to publish.
+- A row with `status: draft` is not cleared for publication — only a `live` row, which requires `approved_by` to be filled in (enforced by `validate.py`), represents something Lucas has actually signed off to publish. A `corrected` row should also carry `approved_by` as a matter of practice, even though the validator doesn't currently enforce that for `corrected` specifically.
 - If you're checking whether a specific published figure is backed by evidence, look it up by `claim_id` here first. If it isn't in this file, treat it as unpublishable regardless of how it reads elsewhere.
+
+---
+
+## Running the validator and its tests
+
+```
+python3 data/evidence/validate.py
+python3 data/evidence/test_validate.py
+```
+
+`validate.py` exits non-zero and prints every failing `claim_id` with the reason if any row breaks a rule (see the script's docstring for the exact list). It checks: duplicate `claim_id`s; at least one source with a tier, a quote and an accessed date; no row relying only on Tier C sources without a marker; no `live` row missing `approved_by`; and no `last_verified` date more than 12 months old (or missing).
+
+**Marker convention for the Tier-C-only rule**, since there's no dedicated column for it: write the word `SENSITIVITY` anywhere in `claim_text` to mark a row as a labelled sensitivity (methodology section 3's unsourced-cost sensitivity rule), or the phrase `EXCEPTION APPROVED` anywhere in `claim_text`, a source name, or `calculation_ref` to mark an approved Tier-C-only exception. Either one clears the rule for a Tier-C-only row.
+
+`test_validate.py` is a self-contained unit test suite with deliberately broken rows proving each rule actually fires (and control cases proving valid rows pass). Run it after any change to `validate.py`.

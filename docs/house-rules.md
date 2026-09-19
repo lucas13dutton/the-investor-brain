@@ -35,19 +35,26 @@ A research and education company. We report what happened to different assets hi
 5. **Correct publicly** when we get something wrong.
 6. Be **transparent about the AI**: say what agents did and what Lucas decided.
 
-### Standard wording
+### Mandatory risk lines
 
-**Risk line (short, on screen):**
+Each line below must appear **verbatim** — word for word, not paraphrased — in the format and position stated. A close rewording does not satisfy this.
+
+**1. Short-form video** — on screen for at least 2 seconds, not caption only:
 > Education, not advice. Past returns don't predict future ones. Investments can fall as well as rise.
 
-**Risk line (spoken, long-form):**
-> This is research and education, not financial advice. What happened in the past doesn't tell you what will happen next, and you can get back less than you put in.
+**2. Long-form video** — spoken once near the start:
+> This is research and education, not financial advice. What happened in the past doesn't tell you what happens next, and you can get back less than you put in.
 
-**Paper portfolio label:**
+**3. Newsletter and website footer** — footer of every newsletter issue and every website page:
+> Assayer is a research and education publisher. Nothing here is financial advice or a recommendation to buy, sell or hold any investment. Past performance is not a guide to future performance. The value of investments can fall as well as rise, and you may get back less than you invested.
+
+"Assayer" is a provisional brand name pending the final name — update this line when the name is finalised.
+
+**4. App, on any comparison result** — attached to every comparison result shown:
+> Historical comparison only, after the costs shown. Different costs, dates or tax circumstances give different results.
+
+**5. Any Strategy Lab output** — attached every time a Strategy Lab result appears:
 > Paper portfolio for research. No real money. Not a signal to act.
-
-**Event window label:**
-> Chosen dates for illustration. See the standard windows for the full picture.
 
 ---
 
@@ -75,9 +82,10 @@ The Compliance agent runs this on every script, caption, thumbnail, newsletter a
 
 ### C. Labels and warnings
 
-- [ ] C1. The risk line is inside the content (on screen or spoken), not only in the caption.
+- [ ] C1. The correct mandatory risk line for this format (see "Mandatory risk lines" above) appears verbatim, in the position required — not only in the caption or description.
 - [ ] C2. Paper portfolios carry the paper portfolio label every time they appear.
 - [ ] C3. AI involvement is described accurately (no overstating what the agents did).
+- [ ] C4. The risk line is legible on a phone screen and sits in a fixed position that doesn't compete with the figures on screen.
 
 ### D. Fairness and people
 

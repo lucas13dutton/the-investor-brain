@@ -11,6 +11,7 @@ The log is `evidence.csv`, one row per claim.
 | Column | Content |
 |---|---|
 | `claim_id` | Unique reference, format `<ASSET>-<NNNN>` (zero-padded to 4 digits), e.g. `GOLD-0001`, `SP500-0001`. Numbers are assigned in the order claims are added, per asset, and are never reused — even if a claim is later withdrawn. |
+| `row_type` | `claim` (default), `structural`, `sensitivity`, or `withdrawn` — see "Row types" below. Determines which sourcing rule the row is held to. |
 | `claim_text` | The exact number or statement as it appears (or will appear) in published content. Plain English, one sentence. |
 | `asset` | The asset the claim is about, lowercase, matching the dossier filename without `.md` (e.g. `gold`, `sp500`). |
 | `window` | The time window the claim covers (e.g. `2015-01 to 2025-12`), or `n/a` if the claim isn't window-dependent — most cost-stack and tax figures aren't. |
@@ -20,8 +21,8 @@ The log is `evidence.csv`, one row per claim.
 | `unit` | The unit for `value` (e.g. `%`, `% p.a.`, `£`, `days`, `bps`). |
 | `source_1_name` | The first source: publisher and page/document name. |
 | `source_1_tier` | `A`, `B` or `C`, per methodology section 7.1. |
-| `source_1_quote` | The exact sentence or clause relied on, verbatim from the page — per methodology section 7.3, a source that names only a page with no quoted line does not belong here. |
-| `source_1_url` | The page's URL. If the dossier this row is drawn from didn't capture a full, precise URL (some don't), say so plainly in this field (e.g. `"gov.uk (full page path not captured in dossiers/x.md)"`) rather than inventing one — and fix it with the real URL as soon as it's found. |
+| `source_1_quote` | The exact sentence or clause relied on, verbatim from the page — per methodology section 7.3, a source that names only a page with no quoted line does not belong here. On a `claim` row, `validate.py` rejects a quote that just describes why no quote was found (see "Quote integrity" below) — find the real quote, or change `row_type` instead. |
+| `source_1_url` | The page's URL, and on a `claim` row it must start with `http`. If the dossier this row is drawn from didn't capture the exact page, use the publisher's homepage (e.g. `https://www.gov.uk`) rather than inventing a deep link, and say so in `source_1_name` (e.g. "— exact page path not individually captured"). Never invent a URL that doesn't resolve to the real publisher. |
 | `source_1_accessed` | The date the source was accessed, `YYYY-MM-DD`. |
 | `source_2_name` … `source_2_accessed` | An optional second source, same five fields, for a claim that needs two sources (e.g. to clear the Tier C sole-support rule, or to show two sources disagree). Leave every `source_2_*` field blank if there's only one source — don't pad it out. |
 | `calculation_ref` | Link or path to the code/notebook that produced the figure, if one exists. Write `n/a — directly sourced from <dossier> section <n>` for a figure taken straight from a cited source rather than calculated — true of almost every row until this company starts computing NRR figures. |
@@ -33,15 +34,29 @@ The log is `evidence.csv`, one row per claim.
 
 ---
 
+## Row types
+
+Every row has a `row_type`. Only `claim` rows are held to the full sourcing rule (a real, quoted, dated, `http` source, and no Tier C source alone without an approved exception). The other three each get a narrower rule of their own, enforced by `validate.py`:
+
+- **`claim`** (default) — an ordinary sourced fact. Needs `source_1_*` (or `source_2_*`) fully filled in with a real quote and an `http` URL, and can't rest on Tier C alone without an `EXCEPTION APPROVED` marker (see below).
+- **`structural`** — a fact with no source because none is needed, e.g. "home storage costs nothing" or a coin's minted specification. No sourcing rule applies at all; leave `source_1_*` blank or use it for background context, whichever reads better.
+- **`sensitivity`** — a cost published as a labelled range or bound under methodology section 3's unsourced-cost sensitivity rule, because a genuine attempt found no real source. `value` and `unit` must state the bound, and **every `source_1_*`/`source_2_*` field must be blank** — a sensitivity row is an assumption, not an evidenced fact, and giving it a fake source manufactures a paper trail for something that isn't actually sourced.
+- **`withdrawn`** — a figure known to be wrong or superseded. If a replacement claim exists, name it in `calculation_ref` or `claim_text` as "replaced by `<CLAIM-ID>`" — `validate.py` checks that ID is real. Naming a replacement is optional; not every withdrawn figure has one yet.
+
+If a row genuinely can't be sourced and doesn't fit `structural` or `sensitivity` either, use `withdrawn` rather than forcing it to pass as a `claim`.
+
+---
+
 ## Adding an entry
 
 1. Pick the next unused `claim_id` for the asset (check the highest existing `<ASSET>-NNNN` in the file).
-2. Copy the claim's exact wording from the dossier into `claim_text`, and pull `value`/`unit` out of it as separate fields.
-3. Fill in `window`, `cost_scenario` and `tax_scenario`, using `n/a` where they don't apply.
-4. Copy the claim's citation from the dossier into `source_1_name`/`source_1_tier`/`source_1_quote`/`source_1_url`/`source_1_accessed`. If the dossier gives a second, corroborating or contradicting source, use the `source_2_*` fields for it — otherwise leave them blank.
-5. Set `calculation_ref` and `checked_by` as they stand today. Leave `approved_by` blank until Lucas actually signs off.
-6. Set `status` to `draft`, and `created`/`last_verified` to today's date.
-7. When a claim is corrected or withdrawn after publication, don't edit its row's history silently — update `status`, and add a new row if a replacement claim is needed, per the corrections process in `docs/methodology.md` section 8.
+2. Decide the `row_type` (see "Row types" above) before filling in anything else — it determines which of the remaining steps actually apply.
+3. Copy the claim's exact wording from the dossier into `claim_text`, and pull `value`/`unit` out of it as separate fields.
+4. Fill in `window`, `cost_scenario` and `tax_scenario`, using `n/a` where they don't apply.
+5. For a `claim` row: copy the citation from the dossier into `source_1_name`/`source_1_tier`/`source_1_quote`/`source_1_url`/`source_1_accessed`, with a real quote and an `http` URL. If the dossier gives a second, corroborating or contradicting source, use the `source_2_*` fields for it — otherwise leave them blank. For `structural`, `sensitivity` or `withdrawn`, follow that type's own rule instead.
+6. Set `calculation_ref` and `checked_by` as they stand today. Leave `approved_by` blank until Lucas actually signs off.
+7. Set `status` to `draft`, and `created`/`last_verified` to today's date.
+8. When a claim is corrected or withdrawn after publication, don't edit its row's history silently — update `status` (and `row_type` to `withdrawn` if the figure itself is retired), and add a new row if a replacement claim is needed, per the corrections process in `docs/methodology.md` section 8.
 
 ---
 
@@ -62,8 +77,8 @@ python3 data/evidence/validate.py
 python3 data/evidence/test_validate.py
 ```
 
-`validate.py` exits non-zero and prints every failing `claim_id` with the reason if any row breaks a rule (see the script's docstring for the exact list). It checks: duplicate `claim_id`s; at least one source with a tier, a quote and an accessed date; no row relying only on Tier C sources without a marker; no `live` row missing `approved_by`; and no `last_verified` date more than 12 months old (or missing).
+`validate.py` exits non-zero and prints every failing `claim_id` with the reason if any row breaks its type's rule (see the script's docstring for the exact list). Every row, regardless of type: no duplicate `claim_id`; no `live` row missing `approved_by`; no `last_verified` date more than 12 months old (or missing). A `claim` row additionally needs: at least one complete source (tier, quote, accessed date); no Tier-C-only sourcing without an `EXCEPTION APPROVED` marker; a real quote, not a description of why one couldn't be found; and a source URL starting with `http`. `structural`, `sensitivity` and `withdrawn` rows each follow their own narrower rule instead — see "Row types" above.
 
-**Marker convention for the Tier-C-only rule**, since there's no dedicated column for it: write the word `SENSITIVITY` anywhere in `claim_text` to mark a row as a labelled sensitivity (methodology section 3's unsourced-cost sensitivity rule), or the phrase `EXCEPTION APPROVED` anywhere in `claim_text`, a source name, or `calculation_ref` to mark an approved Tier-C-only exception. Either one clears the rule for a Tier-C-only row.
+**`EXCEPTION APPROVED` marker**, for a `claim` row that's genuinely Tier-C-only with Lucas's sign-off (e.g. a seller/platform's own current, dated fee page with no Tier A/B alternative): write the phrase anywhere in `claim_text`, a source name, or `calculation_ref`. A genuinely unsourced cost should usually be `row_type: sensitivity` instead, not a `claim` with this marker.
 
-`test_validate.py` is a self-contained unit test suite with deliberately broken rows proving each rule actually fires (and control cases proving valid rows pass). Run it after any change to `validate.py`.
+`test_validate.py` is a self-contained unit test suite with deliberately broken rows proving each rule actually fires (and control cases proving valid rows pass, including one per row type). Run it after any change to `validate.py`.

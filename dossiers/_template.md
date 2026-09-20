@@ -3,6 +3,8 @@
 **Status:** draft · **Owner:** researcher agent · **Date checked:** <YYYY-MM-DD>
 Built per `docs/methodology.md` and `docs/house-rules.md`. Where this template and those documents disagree, the documents win.
 
+**Every numeric claim carries its evidence-log claim ID in brackets immediately after it**, e.g. "0.12% p.a. [GOLD-0015]", matching a real row in `data/evidence/evidence.csv`. No number is published without one — see `data/evidence/README.md`.
+
 ---
 
 ## 1. What it is
@@ -15,7 +17,7 @@ Built per `docs/methodology.md` and `docs/house-rules.md`. Where this template a
 
 ## 3. The cost stack
 
-Every stage from `docs/methodology.md` section 3 must have a row. If a cost does not apply, write "none" in that row and say why — a blank row blocks publication. Every value needs a source and a tier (A, B or C). No Tier C source may be the sole support for a value.
+Every stage from `docs/methodology.md` section 3 must have a row. If a cost does not apply, write "none" in that row and say why — a blank row blocks publication. Every value needs a source and a tier (A, B or C). No Tier C source may be the sole support for a value. Every value also needs its claim ID in brackets, e.g. "3-5% [GOLD-0002]".
 
 ### 3.1 Buying
 

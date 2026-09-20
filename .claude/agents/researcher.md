@@ -22,6 +22,7 @@ One file per asset at `dossiers/<asset>.md`, using `dossiers/_template.md`. It m
 7. **Open questions**: what you couldn't establish, and what would settle it.
 
 ## Rules
+- Every numeric claim carries its evidence-log claim ID in brackets immediately after it (e.g. `0.12% p.a. [GOLD-0015]`), matching a real row in `data/evidence/evidence.csv`. Add the evidence-log row and the bracketed ID together — never leave a number unbracketed, and never bracket an ID that has no row.
 - Label every source with its tier (A, B or C per the methodology). Never let a Tier C source carry a number on its own.
 - Never present an asking price as a sale price.
 - Check and record licence terms before recommending any data source. Never suggest scraping against a site's terms.

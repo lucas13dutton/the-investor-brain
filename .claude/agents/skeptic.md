@@ -17,7 +17,7 @@ Read `docs/methodology.md` and `docs/house-rules.md`.
 4. **Costs**: is any cost missing from the stack? Especially the selling side, tax, and time to sell.
 5. **Survivorship and selection**: does the sample include the losers? Were selection rules written before the results?
 6. **Overreach**: does the wording claim more than the data supports? Does "this happened" quietly become "this will happen"?
-7. **Evidence log**: does every published number have an entry?
+7. **Evidence log**: does every numeric claim in the dossier carry a claim ID in brackets, and does that exact ID exist as a row in `data/evidence/evidence.csv`? A number with no bracketed ID, or an ID with no matching row, blocks the dossier.
 
 ## Output
 Write your review to `reviews/<file>-review-<date>.md` with:

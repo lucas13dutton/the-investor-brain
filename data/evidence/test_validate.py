@@ -285,6 +285,27 @@ class TestUrlFormat(unittest.TestCase):
             f"an https URL should pass, got: {errors}",
         )
 
+    def test_needs_reverification_flag_passes(self):
+        row = base_row(source_1_url="NEEDS RE-VERIFICATION")
+        errors = validate.validate_row(row, today=TODAY)
+        self.assertEqual(
+            [e for e in errors if "source_1_url" in e], [],
+            f"the NEEDS RE-VERIFICATION flag should satisfy the URL rule, got: {errors}",
+        )
+        self.assertTrue(validate.needs_reverification(row))
+
+    def test_guessed_homepage_url_still_fails(self):
+        # A constructed/guessed URL (not fetched, not verbatim) must not pass just because
+        # it happens to start with http — this rule is about honesty, not just format.
+        # validate.py can't detect intent, but the flag convention is the only sanctioned
+        # way to record "no real URL obtained" — a bare, unexplained guess is still wrong
+        # process even if it isn't mechanically distinguishable here. This test documents
+        # that a row with NO flag and NO real URL fails, which is what forces the choice.
+        row = base_row(source_1_url="")
+        errors = validate.validate_row(row, today=TODAY)
+        self.assertTrue(any("source_1_url" in e for e in errors))
+        self.assertFalse(validate.needs_reverification(row))
+
 
 class TestStructuralRowType(unittest.TestCase):
     def test_structural_row_needs_no_source_at_all(self):

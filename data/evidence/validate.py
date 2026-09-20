@@ -24,8 +24,15 @@ Fails (non-zero exit) if any row breaks its type's rule:
        verbatim", "no source found", "no current source" — case-insensitive).
        A "claim" row asserting a fact needs a real quote, not a description
        of why one couldn't be found — reclassify or withdraw instead.
-    7. A used source's URL doesn't start with "http" (case-insensitive).
-       A source with no real URL isn't a source a reader can go check.
+    7. A used source's URL doesn't start with "http" (case-insensitive) AND
+       isn't the literal flag "NEEDS RE-VERIFICATION" (case-insensitive).
+       A URL may only ever be recorded if it was actually fetched or
+       appeared verbatim in a source — never constructed or guessed (e.g.
+       a publisher's homepage stood in for a specific page that was never
+       actually pinned down). If no real URL was obtained, write "NEEDS
+       RE-VERIFICATION" in the URL field instead of inventing one; this
+       flag satisfies the rule honestly rather than papering over the gap,
+       and every row carrying it belongs in docs/open-research-queue.md.
 
   row_type "structural" (a fact with no source, e.g. "home storage costs
   nothing"): no sourcing rule at all — value/unit and claim_text still apply
@@ -93,6 +100,7 @@ MAX_VERIFIED_AGE_DAYS = 365
 EXCEPTION_RE = re.compile(r"EXCEPTION APPROVED", re.IGNORECASE)
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 REPLACED_BY_RE = re.compile(r"replaced by\s+([A-Z]+-\d{4})", re.IGNORECASE)
+NEEDS_REVERIFICATION_RE = re.compile(r"^NEEDS RE-VERIFICATION$", re.IGNORECASE)
 
 NO_REAL_QUOTE_PHRASES = [
     "no verbatim",
@@ -155,6 +163,22 @@ def _quote_lacks_real_content(quote):
     return any(phrase in lowered for phrase in NO_REAL_QUOTE_PHRASES)
 
 
+def needs_reverification(row):
+    """True if any populated source URL on this row is the NEEDS RE-VERIFICATION flag."""
+    for n in (1, 2):
+        url = _clean(row.get(f"source_{n}_url"))
+        if url and NEEDS_REVERIFICATION_RE.match(url):
+            return True
+    return False
+
+
+def replacement_id(row):
+    """The claim_id a withdrawn row names as its replacement, if any, else None."""
+    haystack = " ".join(_clean(row.get(field)) for field in ("claim_text", "calculation_ref"))
+    m = REPLACED_BY_RE.search(haystack)
+    return m.group(1).upper() if m else None
+
+
 def _parse_date(raw):
     raw = _clean(raw)
     if not raw or not DATE_RE.match(raw):
@@ -190,10 +214,18 @@ def _validate_claim_row(row):
                 f"a real one: {quote!r}"
             )
         url = _clean(row.get(f"source_{n}_url"))
-        if url and not url.lower().startswith("http"):
-            errors.append(f"source_{n}_url does not start with 'http': {url!r}")
+        if url and NEEDS_REVERIFICATION_RE.match(url):
+            pass  # honestly flagged, not fabricated — see docs/open-research-queue.md
+        elif url and not url.lower().startswith("http"):
+            errors.append(
+                f"source_{n}_url does not start with 'http' and isn't the "
+                f"'NEEDS RE-VERIFICATION' flag: {url!r}"
+            )
         elif not url:
-            errors.append(f"source_{n}_url is blank (needs a URL starting with 'http')")
+            errors.append(
+                f"source_{n}_url is blank (needs a URL starting with 'http', or the "
+                f"literal flag 'NEEDS RE-VERIFICATION' if no real URL was obtained)"
+            )
 
     return errors
 
@@ -217,14 +249,11 @@ def _validate_sensitivity_row(row):
 
 def _validate_withdrawn_row(row, known_ids):
     errors = []
-    haystack = " ".join(_clean(row.get(field)) for field in ("claim_text", "calculation_ref"))
-    m = REPLACED_BY_RE.search(haystack)
-    if m:
-        replacement_id = m.group(1).upper()
-        if replacement_id not in known_ids:
-            errors.append(
-                f"names a replacing claim_id, {replacement_id!r}, that does not exist in this file"
-            )
+    rid = replacement_id(row)
+    if rid and rid not in known_ids:
+        errors.append(
+            f"names a replacing claim_id, {rid!r}, that does not exist in this file"
+        )
     return errors
 
 

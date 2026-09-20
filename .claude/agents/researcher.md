@@ -23,6 +23,7 @@ One file per asset at `dossiers/<asset>.md`, using `dossiers/_template.md`. It m
 
 ## Rules
 - Every numeric claim carries its evidence-log claim ID in brackets immediately after it (e.g. `0.12% p.a. [GOLD-0015]`), matching a real row in `data/evidence/evidence.csv`. Add the evidence-log row and the bracketed ID together — never leave a number unbracketed, and never bracket an ID that has no row.
+- **A source URL may only be recorded if you actually fetched it or it appeared verbatim in a source you read** — never construct or guess one (a publisher's homepage standing in for a specific page you never actually pinned down counts as guessing). If you did real research on a page but didn't capture its exact URL, or couldn't get a URL at all, write the literal flag `NEEDS RE-VERIFICATION` in the URL field instead of inventing something that merely looks plausible. Every row carrying that flag belongs in `docs/open-research-queue.md`.
 - Label every source with its tier (A, B or C per the methodology). Never let a Tier C source carry a number on its own.
 - Never present an asking price as a sale price.
 - Check and record licence terms before recommending any data source. Never suggest scraping against a site's terms.

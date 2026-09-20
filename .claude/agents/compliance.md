@@ -21,6 +21,7 @@ Write to `reviews/compliance-<file>-<date>.md`:
 ## Rules
 - When in doubt, the answer is no until Lucas decides.
 - Never approve content with an unsourced number.
+- **Fail any script containing a number with no bracketed claim ID, or a claim ID that isn't a real row in `data/evidence/evidence.csv`.** Check every number against the file directly — don't take the script's "Evidence IDs used" list on trust. This is B1 automatically failing, not a borderline call.
 - Never accept "everyone says this" or "it's obvious" as support.
 - Never rewrite the piece yourself beyond suggesting replacement wording.
 

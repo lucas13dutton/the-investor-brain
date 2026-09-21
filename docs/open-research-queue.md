@@ -14,7 +14,7 @@ These rows aren't missing anything mechanically — they have a real quote, tier
 
 | Claim ID | Question | Needed |
 |---|---|---|
-| `SP500-0047` | Is the Bank of England's series XUDLGBD (GBP/USD spot rate, used as this company's FX conversion for the S&P 500 benchmark, `costs/benchmark/`) one of the exchange rate series the Bank excludes from its Open Government Licence for third-party licensing reasons? The Bank's own page doesn't name which series are excluded. | A direct question to the Bank of England, before any figure built on this FX data is published or the raw series is redistributed externally. Currently used for internal calculation only. |
+| `SP500-0074` | **Factual part resolved 2026-09-21** (see `docs/data-licensing.md` "Bank of England spot exchange rate data (XUDLGBD): licence question resolved" and `costs/benchmark/README.md` "Licence status") — series XUDLGBD is confirmed to be sourced from Bloomberg BFIX and/or LSEG, one of the exchange rate series the Bank of England excludes from its Open Government Licence, with LSEG's redistribution restriction applying. The remaining question is a policy one: is Lucas comfortable continuing to build published figures on this data under internal-use-only terms indefinitely, or should the company seek its own LSEG/Bloomberg data licence, or switch to an unambiguously open FX source, before this benchmark (or anything built on it) is published externally? | A decision from Lucas. No further research needed — the underlying fact is settled. |
 
 ---
 

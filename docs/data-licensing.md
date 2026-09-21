@@ -123,3 +123,108 @@ This note deliberately does **not** recommend committing to spend, per the task 
 **What would raise it:** a written answer from Twelve Data's and EODHD's sales/support teams to the specific question in the Recommendation section above; a successful direct read of FMP's own terms of service and pricing page (by a human browser, or once automated access stops being blocked); and, for whichever vendor looks most promising after that, a trial-account check of actual historical depth for CSPX, VUSA, VUAG and Fidelity Index US Fund specifically, before any subscription is purchased.
 
 **On the public datasets specifically (Shiller and Damodaran), added 2026-09-19:** confidence in the underlying facts reported is **medium** — both datasets' own pages were read directly and their licence/usage text quoted verbatim and, for Damodaran, cross-checked twice for consistency, meeting the methodology §7.3 citation bar. What holds this section back from being a settled recommendation: (a) Shiller's file was not opened, so the total-return-column claim is inferred from the page's own description, not confirmed; (b) Shiller's own reuse rights remain genuinely silent, and no direct question has yet been put to the site's own contact (an action this note escalates to Lucas, not takes unilaterally); (c) Kaggle could not be searched due to a JavaScript-rendering limitation in the tools used, so a possible clearer-licence mirror cannot be ruled out. **What would raise it:** opening Shiller's file header row to confirm the total-return column (a small, explicitly authorised follow-up, not a bulk-redistribution step); a written answer from Shiller's site contact on reuse rights for a derived commercial figure; and a human check of Kaggle for either dataset.
+
+---
+
+## UK inflation history before 1988: options for extending the S&P 500 benchmark
+
+**Status:** research only, not a decision, not implemented. **Owner:** researcher agent. **Date checked:** 2026-09-21.
+Written per Lucas's specific request, after `costs/benchmark/README.md` flagged that the benchmark's usable range (1989–2025) is bounded not by Damodaran's S&P 500 data (1928–2025) or the Bank of England's FX series, but by ONS's CPI series D7BT, which only starts in 1988. This section asks: does ONS, or another official/reputable UK source, publish something that fills the 1928–1988 gap? **No bulk data file was downloaded in this pass, no evidence-log row was added, and `costs/benchmark/` was not touched** — per the task's instructions, this is a report for Lucas to decide on, not an implementation.
+
+**A general note on method:** this session's web-search tool was unavailable throughout (session budget exhausted before this task started). Every finding below comes from directly fetching a named URL and reading its actual content, per methodology §7.3 — not from a search summary. Where a URL could not be found or a page returned 404, that is stated plainly rather than papered over with a guessed link, per the house rule against constructed URLs.
+
+### Option A — ONS's own "not National Statistics" modelled CPI/CPIH estimates, 1950 to 1988
+
+Fetched directly from `https://www.ons.gov.uk/economy/inflationandpriceindices/datasets/consumerpriceindices` (ONS's "Consumer price inflation time series" dataset page — the same family of dataset the benchmark's D7BT series comes from), 2026-09-21. The page states, quoted verbatim:
+
+> "CPIH and CPI estimates for the period 1950 to 1988 (1949 to 1987 for index values) are also available."
+
+and, immediately qualifying that:
+
+> "Please note that these earlier estimates are not National Statistics. They have been modelled and are provided purely for indicative purposes."
+
+The same page separately describes a different, later extension:
+
+> "In December 2018, we published extended series for the components of CPIH covering 1988 to 2004 and CPI covering 1988 to 1995."
+
+> "All of the extended series were modelled after the introduction of CPIH and CPI and do not form part of the ongoing National Statistics series at 1 decimal place."
+
+The page's licence statement, quoted verbatim: **"All content is available under the Open Government Licence v3.0, except where otherwise stated."**
+
+**Assessment against the task's five points:**
+
+1. **What it is / publisher:** ONS itself publishes it, inside the same downloadable dataset (MM23-family) that already supplies this company's D7BT series — it is not a separate product from a different body.
+2. **How far back:** to 1950 (1949 for index values) — 38 years further back than D7BT's 1988 start, but still 22 years short of Damodaran's 1928 start.
+3. **Real measurement, official retrospective estimate, or composite/spliced series:** ONS's own words settle this: **"modelled"** and **"not National Statistics."** This is explicitly a retrospective estimate, not a live measurement taken at the time, and ONS itself distinguishes it from the National Statistics-badged CPI series the benchmark currently uses. This is exactly the kind of methodological break methodology §7.2's "CPI throughout" principle is trying to avoid, and ONS is saying so about its own data, not something this research is inferring.
+4. **Licence:** Open Government Licence v3.0 (the page's blanket statement; no override text was seen for this specific dataset) — the same licence D7BT itself uses. **Tier:** this needs a careful call. It is published by ONS (an official body, normally Tier A per methodology §7.1), but ONS's own label — "not National Statistics," "modelled," "indicative" — is a direct statement that this specific series does not carry the same evidential weight as ONS's official statistics. This note treats it as **Tier B** ("well-documented research," published by ONS but explicitly not standing as official statistics), not Tier A, and flags that distinction for Lucas since it affects whether this series could support a headline number on its own under methodology §7.1's rule ("Tier A: can support a headline on its own").
+5. **Downloadable / usable at annual frequency:** Described as available within the same ONS consumer price inflation dataset page already used for D7BT — the page states the estimates "are also available" but does not show a separate CDID/series code or a distinct file link that this pass could isolate and quote; the exact file/tab containing the 1950–1988 figures was not opened (per the task's instruction not to download bulk data). This is a genuine gap: the series' *existence* and *licence* are confirmed, but its *exact downloadable location and format* is not yet pinned down.
+
+### Option B — ONS's Retail Prices Index (RPI), a different, longer-running measure
+
+Fetched directly from `https://www.ons.gov.uk/economy/inflationandpriceindices/timeseries/chaw/mm23` (CDID **CHAW**, "RPI All Items Index: Jan 1987=100"), 2026-09-21. The page states this specific series' own displayed earliest date is **January 1987** and its licence, quoted verbatim: **"All content is available under the Open Government Licence v3.0, except where otherwise stated."**
+
+RPI as a published measure is widely known to run monthly back to 1947 (linking an "Interim Index of Retail Prices" from 1947 to the modern RPI), but **this session could not confirm that longer depth first-hand**: the specific CDID/page fetched showed only the post-1987-rebasing display, and a direct question to the page about whether it links to pre-1987 data returned no confirmation either way. This is recorded as unconfirmed, not asserted.
+
+**Assessment:**
+
+1. **What it is / publisher:** ONS's Retail Prices Index — a different index from CPI, using arithmetic rather than CPI's geometric averaging and a different basket, which is why RPI and CPI give different inflation readings for the same period even when both exist.
+2. **How far back:** genuinely uncertain within this pass — CDID CHAW's own page shows January 1987 as its earliest displayed point; whether ONS still separately publishes the pre-1987 linked series in a form fetchable at the same URL family was not established.
+3. **Real measurement vs. estimate:** RPI itself, where it exists, is understood to be a real contemporaneous measurement (unlike Option A's admitted "modelled" 1950–1988 CPI estimates) — but this is background knowledge, not confirmed by a fetched ONS page in this pass, so it is not cited as settled.
+4. **Licence:** OGL v3.0, per the page fetched. **Tier A**, if the depth-of-history question above is resolved — RPI is still an ONS official statistic (unlike Option A), just a different index from CPI.
+5. **Downloadable:** yes, in the same ONS timeseries format already used for D7BT — no new technical barrier.
+
+**The bigger issue with Option B is not sourcing, it's methodology.** RPI is not CPI. Splicing "RPI pre-1988, CPI 1988-onward" would not be "the same measure throughout" — it would be two different, methodologically distinct indices joined at a seam, which is precisely the kind of change methodology §7.2 currently forecloses by naming CPI specifically. See the flag at the end of this section.
+
+### Option C — Bank of England, "A millennium of macroeconomic data"
+
+Fetched directly from `https://www.bankofengland.co.uk/statistics/research-datasets`, 2026-09-21. The page states, quoted verbatim: **"The dataset contains a broad set of macroeconomic and financial data for the UK stretching back in some cases to the C13th."** It gives benchmark estimates for 1086 (the Domesday Book year) and covers up to **Version 3.1**, dated to 2016. The download link found on the page, appearing verbatim in the page fetched: `/-/media/boe/files/statistics/research-datasets/a-millennium-of-macroeconomic-data-for-the-uk.xlsx` (a 28MB Excel spreadsheet). The page also states it was **"originally called the 'Three centuries of macroeconomic data' spreadsheet but has now been renamed given its broader coverage,"** and names a Bank of England contact, ryland.thomas@bankofengland.co.uk, for queries. It was originally constructed alongside a 2010 Quarterly Bulletin article — attempts to fetch that article directly (`bankofengland.co.uk/quarterly-bulletin/2010/q1/the-uk-recession-in-context-what-do-three-centuries-of-data-tell-us` and a PDF variant) both returned 404 in this pass, so the article's own text could not be independently checked.
+
+**Assessment:**
+
+1. **What it is / publisher:** the Bank of England's own long-run macroeconomic dataset, not ONS. This matches the "another real, well-known long-run UK economic data series" the task named.
+2. **How far back:** centuries — nominally to the 13th century, with a specific 1086 benchmark point, comfortably covering Damodaran's 1928 start with enormous room to spare. Version 3.1 runs to 2016, so a further, separately-sourced 2017–2025 fill would still be needed regardless of which option is chosen.
+3. **Real measurement, estimate, or composite:** **not established in this pass.** Academic long-run UK datasets of this kind are, as a general matter of how such series are built, understood to be composites — splicing together different historical price series compiled by different researchers over different centuries (this is common knowledge about this genre of dataset, not something this fetch confirmed). **This pass did not open the spreadsheet** (per the task's explicit instruction not to download bulk data), so it cannot confirm from firsthand reading whether the dataset actually contains a price/inflation/cost-of-living index at all, let alone its precise construction. The page's own descriptive text, read directly, does not itself say "this includes a price index" — that would need opening the file, which was deliberately not done here.
+4. **Licence:** **not stated on the research-datasets page itself** — no licence, copyright or reuse text appears there. Separately, the Bank of England's own general legal/data-reuse page (fetched directly, 2026-09-21) states: **"Reproduction of data in the Database is subject to the terms of the UK Open Government Licence,"** with an explicit carve-out: **"selected exchange rate data and series are excluded from this licence as they are reproduced by the Bank under licence from third parties."** It is **not confirmed** whether "the Database" in that statement is the same thing as the separate "research datasets" section hosting the millennium spreadsheet, or a distinct product (the Bank's Statistical Interactive Database, which is what `costs/benchmark/README.md` already flags as ambiguous for the XUDLGBD FX series). This is the same open licence question already tracked for the Bank's FX data, now applying to a second, distinct Bank of England dataset. **Tier:** provisionally B pending that confirmation — a well-documented, named, attributed academic-style compilation from an official body, but not confirmed as carrying the same OGL cover as the Bank's headline statistical releases.
+5. **Downloadable / usable:** yes, a direct .xlsx download link exists with no login or click-through wall visible on the page. Whether its frequency (annual, presumably, for the earliest centuries) and its exact price-series column would fit this company's annual-frequency calculation is unconfirmed without opening the file.
+
+### Option D — a longer ONS composite splice (background only; not independently verified this session)
+
+The task specifically asked about an ONS long-run "Composite Price Index," sometimes referenced in ONS's own long-run inflation articles stretching back to the 1750s. This is understood, from general background knowledge of UK price-index history, to correspond to a one-off ONS/Economic Trends-style retrospective article (commonly cited as "Consumer Price Inflation since 1750," authored within ONS around 2004, splicing together pre-1914 price indices, an interwar cost-of-living index, and the post-1947 RPI into one long composite run). **This session could not confirm this exists on ONS's current website**: several direct URL attempts based on ONS's old and new site structures all returned 404, and a direct fetch of ONS's own site search for the phrase "consumer price inflation since 1750" returned only recent monthly CPI bulletins in the visible results, not this article. Per the house rule on sourcing, **no quote, tier or licence conclusion is given for this option** — it is recorded here only as a lead worth a human researcher chasing (for example, via the UK Government Web Archive, which preserves ONS's old `ons.gov.uk/ons/rel/...` URL structure), not as an established source. It must not be treated as citable until someone actually opens and reads it.
+
+### Comparison at a glance
+
+| Option | Publisher | Depth | Nature | Licence (confirmed?) | Tier | Closes the 1928 gap? |
+|---|---|---|---|---|---|---|
+| A: ONS modelled CPI/CPIH 1950–1988 | ONS | to 1950 | Explicitly "modelled," "not National Statistics" | OGL v3.0, confirmed on the dataset's own page | B | Partly — cuts the gap from 60 years to 22 |
+| B: ONS RPI (CHAW and predecessor series) | ONS | possibly to 1947, depth unconfirmed this pass | Believed a real contemporaneous measurement, but a *different index from CPI* | OGL v3.0, confirmed for the part fetched | A (RPI itself), but see methodology-break flag below | Possibly, if depth confirmed — but breaks "same measure" |
+| C: BoE "A millennium of macroeconomic data" | Bank of England | to the 13th century (nominally) | Unconfirmed — likely a composite, not opened this pass | Not stated on its own page; general BoE Database OGL statement may or may not apply | B, provisionally | Yes, if content and licence both confirmed |
+| D: ONS long-run composite ("since 1750") | ONS (believed) | to 1750 (believed) | Believed a composite splice | Not established | Not established | Unconfirmed — not located this session |
+
+### Recommendation
+
+**No option here is ready to implement today.** Of the four, **Option A (ONS's own modelled 1950–1988 CPI/CPIH estimates) is the most immediately promising low-effort next step**: it is ONS's own data, sitting inside the same dataset family the benchmark already uses, under the same OGL licence already relied on for D7BT, and it would extend the benchmark's usable range from 1989 back to roughly 1951 — a real, meaningful improvement — without introducing a different index. Its only real problem is that ONS itself has already flagged it as not-official-statistics and modelled, which is an honesty question (label it clearly as such, the same way this document already labels Damodaran's data as Tier B) rather than a licensing blocker. The next concrete step, if Lucas wants to pursue it, is finding and opening the exact file/tab inside ONS's consumer price inflation dataset that carries these 1950–1988 figures, to confirm format and exact series codes — a small, targeted follow-up, not a new research programme.
+
+**Option C (the Bank of England's millennium dataset) is the only option that could plausibly reach all the way back to 1928 and beyond**, and is worth a follow-up specifically to (a) open the file and confirm it actually contains a usable UK price/inflation series, and (b) get the Bank's own confirmation of which licence covers "research datasets" specifically — bundled with the identical open question already tracked for the Bank's FX series in `costs/benchmark/README.md`, so one email to the Bank of England could resolve both at once.
+
+**Option B (RPI) should be treated cautiously**, not because of sourcing but because of what adopting it would mean for methodology itself (see below).
+
+**Option D remains an unconfirmed lead, not a source**, until someone actually locates and reads it.
+
+### Flag: this is not just a data swap — it would need a decisions-log entry
+
+Methodology §7.2 currently states plainly: **"Inflation uses the ONS Consumer Prices Index (CPI) throughout, for consistency."** The Decisions log also separately records, 17 Sep 2026: **"Inflation measure | CPI (Consumer Prices Index)."**
+
+If it turns out that no CPI-equivalent series exists before 1988 except RPI-based ones (which is the likely outcome unless Option A's 1950–1988 modelled *CPI* estimates, or Option C's BoE dataset, turn out to be usable and sufficient), then extending the benchmark further back than 1950 would mean either:
+
+- splicing RPI (a different index, different methodology, different historical readings of inflation) onto CPI at some seam year, or
+- adopting a third-party composite/modelled series (BoE's millennium dataset, or an ONS retrospective composite if Option D is ever confirmed) in CPI's place for the earlier years,
+
+either of which changes what "inflation" means in this company's published numbers for part of the window and is not consistent with methodology §7.2's "CPI throughout" wording as currently written. **This is a decisions-log-level change, not a data-source swap**: it would need Lucas to explicitly decide whether "CPI throughout" should be relaxed to something like "the best available UK consumer price measure for the period, stated per window," with the seam year and the index change disclosed on every affected figure — the same way this document already treats the Damodaran/BoE/ONS benchmark chain itself as a Decisions-log-worthy choice, not a routine data pick. This note does not make that call; it only flags that the choice exists and names what would need to be decided.
+
+### Open questions
+
+1. Where exactly, in what file/tab/series code, do ONS's own 1950–1988 modelled CPI/CPIH estimates (Option A) actually live for download? The dataset page states they exist and quotes their status, but this pass did not isolate a specific file link or CDID for them.
+2. Does ONS's RPI series (CDID CHAW or a predecessor code) actually extend back to 1947/1948 in a form fetchable from ons.gov.uk today, and under what exact code? Not confirmed this pass — the fetched page showed only the post-1987 rebased view.
+3. Does the Bank of England's "A millennium of macroeconomic data" spreadsheet (Option C) actually contain a UK price/inflation/cost-of-living index column, and if so, at what frequency and back to what year? Not confirmed — the file was deliberately not opened in this pass. This would settle it: a small, explicitly authorised follow-up opening just the file's header rows/tab list, not a bulk-redistribution exercise.
+4. Does the Bank of England's Open Government Licence statement (quoted above, from its general legal/data-reuse page) actually cover the "research datasets" section specifically, or only the separate Statistical Interactive Database (where the XUDLGBD FX series already has an open, unresolved licence question per `costs/benchmark/README.md`)? Not established — would need a direct question to the Bank of England, ideally covering both datasets at once.
+5. Does ONS still publish, anywhere on its current site, the long-run composite historical inflation series referenced in the task (sometimes called a "Composite Price Index," believed to correspond to a 2004-era ONS/Economic Trends article reaching back to 1750)? Not located in this pass — every direct URL guess returned 404 and ONS's own site search did not surface it in visible results. This would settle it: a human search of the UK Government Web Archive's preserved copy of ONS's old site structure, or a direct enquiry to ONS.

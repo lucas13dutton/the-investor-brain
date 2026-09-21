@@ -2,7 +2,9 @@
 
 **Status: draft specs. None of the three is built.** This document describes what each is intended to do, so that what gets built matches what the brain already promises in `docs/methodology.md` and `docs/house-rules.md`. Nothing here is a commitment to a build date.
 
-These are three surfaces of the Asset Theory brand — see the "Naming" section in the root `README.md` for the full naming hierarchy.
+These are five surfaces of the Asset Theory brand — see the "Naming" section in the root `README.md` for the full naming hierarchy.
+
+> **Hard constraint on the Asset Scorecard and Portfolio X-ray, specifically:** neither tool may ever produce a personalised recommendation, a forecast of future performance, or a rating of an individual security (a specific fund, ticker, property or item). Both describe asset *types*, or a user's own existing holdings, using historical and current data only. Both require a UK financial promotions specialist review before launch, per `docs/house-rules.md`'s existing rule that a specialist reviews any paid-adjacent or user-facing product before it ships. These two constraints are stated once here and referenced, not restated in full, in each product's own "Compliance constraints" section below.
 
 ---
 
@@ -119,3 +121,77 @@ Readers curious whether a mechanical strategy (e.g. rebalancing rules, trend rul
 - No personalised output: results are shown as run, not adjusted per viewer.
 - No signals: labelled as research on historical data on every view, never as a live or ongoing recommendation. Killed strategies stay visible, not hidden.
 - Carries the paper portfolio risk line on every output, every time, per `docs/house-rules.md` mandatory risk lines.
+
+---
+
+## Asset Scorecard
+
+Rates asset *types* on a fixed set of descriptive, historical factors — never a specific fund, ticker, property or item.
+
+### What it does
+
+Shows each asset class's value on the factors set out in `docs/scorecard-method.md` (pending Lucas's approval — see that document's own escalation before this product is built): cost drag, liquidity, historical drawdown, dispersion of historical outcomes, tax treatment and shelter eligibility, data quality, and structural/selection-bias exposure. Factors are shown side by side per asset type; whether they are ever combined into a single score is itself an open question in `docs/scorecard-method.md` section 4, not decided here. Every figure shown traces to a dossier and an evidence-log claim, the same as `Research`.
+
+### Who it's for
+
+A reader deciding which asset's full dossier or Autopsy comparison to look at next — a quick, honest snapshot of what an asset class actually is (costly, illiquid, volatile, well- or poorly-evidenced) before going deeper, not a signal to act on.
+
+### What it draws on
+
+| Part of the brain | How it's used |
+|---|---|
+| `docs/scorecard-method.md` | The approved factor definitions, methods and scales — the Scorecard implements exactly these, nothing more, once approved. |
+| `dossiers/*.md` | Cost stack, time-to-sell, tax treatment (section 4) and item-vs-index classification (section 6) feed the factors directly. |
+| `costs/` | Rolling-window calculations (in the style of `costs/benchmark/`) feed the historical-drawdown and dispersion factors where they exist for an asset. |
+| `data/evidence/evidence.csv` | Only cleared (approved, non-draft) claims feed a live factor value; the tier mix of an asset's own rows is itself the data-quality factor's input. |
+
+### What has to exist before it can be built
+
+- Lucas's approval of `docs/scorecard-method.md`'s recommended factors, and answers to its three open escalation questions (combined vs side-by-side display, band cut-offs, how to show assets with no historical series).
+- At least three or four assets with dossiers and evidence-log entries good enough to be marked cleared, so the Scorecard isn't a one-asset table.
+- A UK financial promotions specialist review before launch (see the hard-constraint note above).
+
+### Compliance constraints
+
+- **Hard constraint (see note above):** no personalised recommendations, no forecasts, no rating of an individual security — asset *types* only, historical and descriptive factors only.
+- No recommendations: a factor value is never framed as "so buy" or "avoid."
+- No personalised output: the same Scorecard for every viewer.
+- No signals: no "as of today" framing, no colour-coded urgency styling that implies a timing cue.
+- Carries the standard risk line for its format, per `docs/house-rules.md` mandatory risk lines.
+
+---
+
+## Portfolio X-ray
+
+Describes a user's own existing holdings — never rates, ranks or recommends them.
+
+### What it does
+
+Given a user's own portfolio (whatever assets and amounts they enter), shows its cost drag (the platform, fund and product costs they're actually paying, drawn from the relevant dossiers), concentration (the share held in each asset, sector or single item), currency exposure (the share priced in GBP versus other currencies), and historical outcome ranges (what a similarly-weighted mix has historically returned over the standard windows, per methodology section 4 — never a projection of what *this* portfolio will return going forward). Every figure is stated plainly, with no grading: a concentration figure is shown as a percentage, never labelled "high risk" or given a red/amber/green rating, since that would itself be an implicit judgment this product isn't allowed to make.
+
+### Who it's for
+
+A reader who wants to understand what they actually hold — its real cost, its real spread across assets and currencies, and how a similar historical mix has behaved — without being told to change anything about it.
+
+### What it draws on
+
+| Part of the brain | How it's used |
+|---|---|
+| `dossiers/*.md` | Cost stack and currency treatment for each asset the user holds. |
+| `costs/` | The cost models applied to whatever the user says they hold. |
+| `data/evidence/evidence.csv` | Any published figure used in the description (e.g. a historical outcome range) must itself be a cleared claim. |
+| `costs/benchmark/`-style calculations | Historical outcome ranges for a given asset mix and window, reusing the same rolling-window method already built for the S&P 500. |
+
+### What has to exist before it can be built
+
+- A defined, safe way for a user to enter their holdings — this is the first product in this document to handle a user's personal financial data, and needs its own data-handling/privacy review before anything is built, not just a compliance-content review.
+- Enough assets with dossiers, cost models and evidence-log entries cleared for use that a real portfolio (not just gold and the S&P 500) can actually be described.
+- A UK financial promotions specialist review before launch (see the hard-constraint note above) — given this is the closest of the five products to describing an individual's actual financial position, this review should be treated as the highest-scrutiny of the five, not a formality.
+
+### Compliance constraints
+
+- **Hard constraint (see note above):** no personalised recommendations, no forecasts, no rating of an individual security — and, specific to this product, no rating, ranking or grading of the user's own holdings either (no "your concentration is too high," no red/amber/green, no "consider diversifying"). Description only.
+- No recommendations: never suggests a trade, a rebalance, or a different allocation.
+- No personalised output *beyond the description itself*: the tool reflects back what the user entered — it must not infer anything about the user (age, goals, risk appetite) beyond the holdings they typed in.
+- No signals: no alerts, no "this has changed since you last checked" framing.
+- Carries the standard risk line for its format, per `docs/house-rules.md` mandatory risk lines, plus an explicit "this is a description of your holdings, not advice" statement on every result, given how close this product sits to advice-adjacent territory.

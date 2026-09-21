@@ -23,6 +23,8 @@ Private while the brand is being finalised.
 | Evidence library | Research | Studies, methods, sources, findings. |
 | Comparison feature and video series | Asset Autopsy | "Compare assets" — the feature and the video series deliberately share this name. |
 | Strategy testing area | Strategy Lab | Pre-registered paper-portfolio testing, per `docs/methodology.md` section 9. |
+| Asset-class rating feature | Asset Scorecard | Rates asset types (never individual securities) on fixed, descriptive, historical factors — see `docs/scorecard-method.md` and `docs/products.md`. |
+| Portfolio description feature | Portfolio X-ray | Describes a user's own holdings by cost, concentration, currency exposure and historical outcome ranges — never rates, ranks or recommends. See `docs/products.md`. |
 
 "Asset Theory" is the confirmed working name, subject to trademark, company and domain checks.
 

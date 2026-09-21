@@ -6,10 +6,13 @@ Data sources (raw files in data/raw/, gitignored, downloaded by
 fetch_raw_data.py — see README.md for URLs, access dates and licence notes):
   - Damodaran's annual S&P 500 total return series (NYU Stern), 1928-2025.
   - Bank of England XUDLGBD daily GBP-per-USD spot rate, 1975-present.
-  - ONS CPI (D7BT, all items index, 2015=100), annual, 1988-2025.
+  - ONS CPI (D7BT, all items index, 2015=100), December-on-December, 1988-2025.
 
-See README.md in this folder for the full method and every assumption,
-including how FX timing is handled and why the usable range starts in 1989.
+Every window is computed twice: a "floor" scenario (the ETF bid-ask spread
+excluded, since no source for it was ever found) and a "ceiling" scenario
+(the spread included at its labelled 0.05% sensitivity upper bound, applied
+each way) — per methodology section 3's unsourced-cost sensitivity rule,
+which requires showing both, not just the excluded version. See README.md.
 
 Usage: python3 costs/benchmark/build_benchmark.py
 Outputs: costs/benchmark/results.csv, costs/benchmark/summary.csv
@@ -38,6 +41,12 @@ SELL_COMMISSION_GBP = 5.00       # SP500-0006, AJ Bell, central (same schedule)
 ANNUAL_OCF_RATE = 0.0007         # SP500-0016/0017, VUSA/CSPX, central, 0.07% p.a.
 ANNUAL_PLATFORM_FEE_RATE = 0.0025  # SP500-0013, AJ Bell, central, 0.25% p.a. (cap not reached at this lump sum)
 ANNUAL_COST_DRAG = ANNUAL_OCF_RATE + ANNUAL_PLATFORM_FEE_RATE  # 0.0032
+
+# SP500-0004: the ETF bid-ask spread, a labelled sensitivity with no real source.
+# "Floor" = excluded (£0). "Ceiling" = the dossier's own stated 0.05% (5bps) upper
+# bound, applied once on the way in and once on the way out, as a % of the
+# traded value at that point — not an invented central figure either way.
+SPREAD_CEILING_RATE = 0.0005
 
 
 def load_damodaran_returns(xls_path):
@@ -86,17 +95,26 @@ def load_boe_year_end_rates(html_path):
     return {year: rate for year, (key, rate) in year_end_rate.items()}
 
 
-def load_ons_annual_cpi(csv_path):
-    """Return {year: CPI index value (annual average)} from the raw ONS CSV export."""
+def load_ons_december_cpi(csv_path):
+    """Return {year: December CPI index value} from the raw ONS CSV export.
+
+    Uses December-on-December, not the annual average, to match the year-end
+    convention already used for returns and FX — see README.md "Inflation"
+    for why a skeptic review (2026-09-21) found the earlier annual-average
+    choice a real, dateable problem (e.g. the Dec 2008 UK VAT cut distorts
+    that December's reading relative to 2008's own annual average), not a
+    negligible one, at least for short windows.
+    """
     cpi = {}
-    year_row_re = re.compile(r"^(\d{4})$")
+    dec_row_re = re.compile(r"^(\d{4}) DEC$")
     with csv_path.open(newline="", encoding="utf-8") as f:
         for row in csv.reader(f):
             if len(row) != 2:
                 continue
-            year_field, value_field = row
-            if year_row_re.match(year_field):
-                cpi[int(year_field)] = float(value_field)
+            period_field, value_field = row
+            m = dec_row_re.match(period_field)
+            if m:
+                cpi[int(m.group(1))] = float(value_field)
     return cpi
 
 
@@ -112,7 +130,7 @@ def compute_window(start_year, length, damodaran, fx, cpi):
     if (start_year - 1) not in cpi or end_year not in cpi:
         return None
 
-    # 1. Cost-adjusted USD growth factor, compounded year by year.
+    # 1. Cost-adjusted USD growth factor, compounded year by year (spread not yet applied).
     usd_growth = 1.0
     for y in years_needed:
         usd_growth *= (1 + damodaran[y]) * (1 - ANNUAL_COST_DRAG)
@@ -127,17 +145,20 @@ def compute_window(start_year, length, damodaran, fx, cpi):
     grown_usd = invested_usd * usd_growth
     grown_gbp = grown_usd * rate_end
 
-    total_cash_in = ILLUSTRATIVE_LUMP_SUM_GBP + BUY_COMMISSION_GBP
-    net_proceeds = grown_gbp - SELL_COMMISSION_GBP
-
-    nominal_annual_return = (net_proceeds / total_cash_in) ** (1 / length) - 1
-
-    # 3. Deflate by average annual CPI inflation over the same window.
+    # 3. Deflate by December-on-December CPI inflation over the same window.
     cpi_start = cpi[start_year - 1]
     cpi_end = cpi[end_year]
     avg_annual_inflation = (cpi_end / cpi_start) ** (1 / length) - 1
 
-    net_real_return = (1 + nominal_annual_return) / (1 + avg_annual_inflation) - 1
+    def scenario(spread_rate):
+        total_cash_in = ILLUSTRATIVE_LUMP_SUM_GBP * (1 + spread_rate) + BUY_COMMISSION_GBP
+        net_proceeds = grown_gbp * (1 - spread_rate) - SELL_COMMISSION_GBP
+        nominal = (net_proceeds / total_cash_in) ** (1 / length) - 1
+        real = (1 + nominal) / (1 + avg_annual_inflation) - 1
+        return round(total_cash_in, 2), round(net_proceeds, 2), nominal, real
+
+    floor_cash_in, floor_proceeds, floor_nominal, floor_real = scenario(0.0)
+    ceiling_cash_in, ceiling_proceeds, ceiling_nominal, ceiling_real = scenario(SPREAD_CEILING_RATE)
 
     return {
         "start_year": start_year,
@@ -145,11 +166,15 @@ def compute_window(start_year, length, damodaran, fx, cpi):
         "window_length": length,
         "fx_rate_start": rate_start,
         "fx_rate_end": rate_end,
-        "total_cash_in_gbp": round(total_cash_in, 2),
-        "net_proceeds_gbp": round(net_proceeds, 2),
-        "nominal_annual_return": nominal_annual_return,
         "avg_annual_inflation": avg_annual_inflation,
-        "net_real_return": net_real_return,
+        "total_cash_in_gbp_floor": floor_cash_in,
+        "net_proceeds_gbp_floor": floor_proceeds,
+        "nominal_annual_return_floor": floor_nominal,
+        "net_real_return_floor": floor_real,
+        "total_cash_in_gbp_ceiling": ceiling_cash_in,
+        "net_proceeds_gbp_ceiling": ceiling_proceeds,
+        "nominal_annual_return_ceiling": ceiling_nominal,
+        "net_real_return_ceiling": ceiling_real,
     }
 
 
@@ -175,29 +200,32 @@ def build_summary(results):
         rows = by_length.get(length, [])
         if not rows:
             continue
-        rows_sorted = sorted(rows, key=lambda r: r["net_real_return"])
-        worst = rows_sorted[0]
-        best = rows_sorted[-1]
-        med = median(r["net_real_return"] for r in rows)
-        summary.append({
-            "window_length": length,
-            "n_windows": len(rows),
-            "median_net_real_return": med,
-            "worst_net_real_return": worst["net_real_return"],
-            "worst_start_year": worst["start_year"],
-            "worst_end_year": worst["end_year"],
-            "best_net_real_return": best["net_real_return"],
-            "best_start_year": best["start_year"],
-            "best_end_year": best["end_year"],
-        })
+        summary_row = {"window_length": length, "n_windows": len(rows)}
+        for scenario in ("floor", "ceiling"):
+            key = f"net_real_return_{scenario}"
+            rows_sorted = sorted(rows, key=lambda r: r[key])
+            worst = rows_sorted[0]
+            best = rows_sorted[-1]
+            med = median(r[key] for r in rows)
+            summary_row[f"median_net_real_return_{scenario}"] = med
+            summary_row[f"worst_net_real_return_{scenario}"] = worst[key]
+            summary_row[f"worst_start_year_{scenario}"] = worst["start_year"]
+            summary_row[f"worst_end_year_{scenario}"] = worst["end_year"]
+            summary_row[f"best_net_real_return_{scenario}"] = best[key]
+            summary_row[f"best_start_year_{scenario}"] = best["start_year"]
+            summary_row[f"best_end_year_{scenario}"] = best["end_year"]
+        summary.append(summary_row)
     return summary
 
 
 def write_results_csv(results, path):
     fieldnames = [
         "start_year", "end_year", "window_length", "fx_rate_start", "fx_rate_end",
-        "total_cash_in_gbp", "net_proceeds_gbp", "nominal_annual_return",
-        "avg_annual_inflation", "net_real_return",
+        "avg_annual_inflation",
+        "total_cash_in_gbp_floor", "net_proceeds_gbp_floor",
+        "nominal_annual_return_floor", "net_real_return_floor",
+        "total_cash_in_gbp_ceiling", "net_proceeds_gbp_ceiling",
+        "nominal_annual_return_ceiling", "net_real_return_ceiling",
     ]
     with path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -207,11 +235,13 @@ def write_results_csv(results, path):
 
 
 def write_summary_csv(summary, path):
-    fieldnames = [
-        "window_length", "n_windows", "median_net_real_return",
-        "worst_net_real_return", "worst_start_year", "worst_end_year",
-        "best_net_real_return", "best_start_year", "best_end_year",
-    ]
+    fieldnames = ["window_length", "n_windows"]
+    for scenario in ("floor", "ceiling"):
+        fieldnames += [
+            f"median_net_real_return_{scenario}",
+            f"worst_net_real_return_{scenario}", f"worst_start_year_{scenario}", f"worst_end_year_{scenario}",
+            f"best_net_real_return_{scenario}", f"best_start_year_{scenario}", f"best_end_year_{scenario}",
+        ]
     with path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -227,7 +257,7 @@ def main():
 
     damodaran = load_damodaran_returns(DAMODARAN_XLS)
     fx = load_boe_year_end_rates(BOE_HTML)
-    cpi = load_ons_annual_cpi(ONS_CSV)
+    cpi = load_ons_december_cpi(ONS_CSV)
 
     results = build_results(damodaran, fx, cpi)
     summary = build_summary(results)
@@ -238,14 +268,15 @@ def main():
     print(f"Wrote {len(results)} window(s) to results.csv")
     print(f"Wrote {len(summary)} summary row(s) to summary.csv")
     for row in summary:
-        print(
-            f"  {row['window_length']:2d}yr ({row['n_windows']} windows): "
-            f"median {row['median_net_real_return']:+.2%}, "
-            f"worst {row['worst_net_real_return']:+.2%} "
-            f"({row['worst_start_year']}-{row['worst_end_year']}), "
-            f"best {row['best_net_real_return']:+.2%} "
-            f"({row['best_start_year']}-{row['best_end_year']})"
-        )
+        print(f"  {row['window_length']:2d}yr ({row['n_windows']} windows):")
+        for scenario in ("floor", "ceiling"):
+            print(
+                f"    {scenario:8s}: median {row[f'median_net_real_return_{scenario}']:+.2%}, "
+                f"worst {row[f'worst_net_real_return_{scenario}']:+.2%} "
+                f"({row[f'worst_start_year_{scenario}']}-{row[f'worst_end_year_{scenario}']}), "
+                f"best {row[f'best_net_real_return_{scenario}']:+.2%} "
+                f"({row[f'best_start_year_{scenario}']}-{row[f'best_end_year_{scenario}']})"
+            )
     return 0
 
 

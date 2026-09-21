@@ -1,6 +1,6 @@
 # S&P 500 GBP benchmark calculation
 
-**Status:** first build, draft. Not skeptic-reviewed. Not published — every figure below is `status: draft` in the evidence log.
+**Status:** second build, after one skeptic review. Not published — every figure below is `status: draft` in the evidence log. See `reviews/benchmark-review-2026-09-21.md` for the full review; this README reflects the fixes made in response to it (December-on-December CPI, and the dual-sided spread sensitivity below) — the FX direction and year-end selection were both independently checked and confirmed correct, no change needed there.
 
 This computes the S&P 500 global-shares benchmark's nominal, cost-adjusted and net real return, in GBP, for a UK investor, per `docs/methodology.md`'s "public-data benchmark chain" decision (Damodaran + Bank of England + ONS, Decisions log 19 Sep 2026). It reproduces the calculation for every available rolling window at four lengths (1, 5, 10, 20 years), per methodology section 4.
 
@@ -26,7 +26,7 @@ Run in order: `python3 fetch_raw_data.py`, then `python3 build_benchmark.py`, th
 |---|---|---|---|
 | Aswath Damodaran (NYU Stern) | Annual S&P 500 total return, dividends included | 1928–2025 | `SP500-0044` (data), `SP500-0045` (licence) |
 | Bank of England, series XUDLGBD | Daily GBP-per-USD spot exchange rate | 1975–present | `SP500-0046` (data), `SP500-0047` (licence) |
-| ONS, series D7BT | Annual UK CPI index (2015=100) | 1988–2025 | `SP500-0048` (data), `SP500-0049` (licence) |
+| ONS, series D7BT | UK CPI index (2015=100), December-on-December | 1988–2025 | `SP500-0048` (data), `SP500-0049` (licence) |
 
 ### Licence status
 
@@ -42,7 +42,9 @@ For a window starting in year `Y` and running `N` years (to year `Y+N-1`):
 2. **Currency conversion.** Convert an illustrative £10,000 lump sum to USD at the **year-end rate for `Y-1`** (i.e. the rate just before the window starts), grow it in USD, then convert the result back to GBP at the **year-end rate for `Y+N-1`** (the window's last year). See "FX timing and direction" below for why endpoints, not a rate applied every year, give the same answer.
 3. **One-off costs.** Total cash in = £10,000 + a buying commission. Net proceeds = the grown, converted amount, minus a selling commission.
 4. **Nominal annual return** = `(net proceeds / total cash in) ^ (1/N) − 1`, per `docs/methodology.md` section 1.2.
-5. **Net real return** = deflate the nominal return by the average annual CPI inflation over the same window (`(CPI_{Y+N-1} / CPI_{Y-1}) ^ (1/N) − 1`), per methodology section 1.2 step 4.
+5. **Net real return** = deflate the nominal return by the average annual CPI inflation over the same window (`(CPI_{Y+N-1} / CPI_{Y-1}) ^ (1/N) − 1`, using December-on-December CPI — see "Inflation" below), per methodology section 1.2 step 4.
+
+Steps 1–5 are run **twice** per window — once excluding the ETF bid-ask spread cost, once including it at its labelled sensitivity upper bound — see "Cost assumptions" below.
 
 This is done for **every start year the data supports**, per methodology's rolling-window rule (section 4, item 2) — not a hand-picked date.
 
@@ -69,7 +71,7 @@ This is done for **every start year the data supports**, per methodology's rolli
 | Fund OCF | 0.07% p.a. | `SP500-0016` / `SP500-0017` (VUSA/CSPX) | Included in the annual cost drag. |
 | Platform fee | 0.25% p.a., capped at £3.50/month | `SP500-0013` (AJ Bell) | Included in the annual cost drag. At £10,000, 0.25% = £25/year, below the £42/year cap — the cap never binds in this calculation. |
 | **Total annual cost drag** | **0.32% p.a.** | sum of the two rows above | Applied to every year's USD return before FX conversion: `(1 + return) × (1 - 0.0032)`. |
-| ETF bid-ask spread | not applied | `SP500-0004` (a labelled sensitivity, not a settled central figure) | The dossier's own central-scenario value for this cost is "not sourced — no central figure is invented." Excluding it here is consistent with that, not an oversight, but it means this calculation is very slightly optimistic. |
+| ETF bid-ask spread | **£0 (floor) / 0.05% each way (ceiling)** | `SP500-0004` (a labelled sensitivity, not a settled central figure) | The dossier's own central-scenario value for this cost is "not sourced — no central figure is invented." Per methodology section 3's unsourced-cost sensitivity rule, this build shows **both** sides explicitly, applied once on buying and once on selling: `results.csv` and `summary.csv` carry a `_floor` set of columns (spread excluded) and a `_ceiling` set (spread included at 5bps each way), for every window. A skeptic review (2026-09-21) found the first build only computed the floor version, which didn't actually satisfy the rule — fixed here. |
 
 This uses **Route A (ETF)** from `dossiers/sp500.md`, specifically AJ Bell as the platform and VUSA/CSPX as the fund — one internally consistent combination, not a blend across platforms. Route B (open-ended fund) would give a slightly different, also-defensible answer.
 
@@ -79,7 +81,9 @@ This uses **Route A (ETF)** from `dossiers/sp500.md`, specifically AJ Bell as th
 
 ## Inflation
 
-Average annual CPI inflation over a window is computed as `(CPI_end / CPI_start) ^ (1/N) − 1`, using ONS's own **annual average** index values for the calendar year before the window starts and the window's final calendar year. Mixing an annual-average CPI reference point with year-end FX reference points is a minor internal inconsistency (different points in the calendar year), accepted here for simplicity rather than resolved with, say, a December-only CPI series.
+Average annual CPI inflation over a window is computed as `(CPI_end / CPI_start) ^ (1/N) − 1`, using ONS's **December** index value (not the annual average) for the calendar year before the window starts and the window's final calendar year — matching the year-end convention already used for FX and, implicitly, for when a year's return is deemed to have completed.
+
+**This was originally built on the annual average instead, and a skeptic review (2026-09-21) found that a real, not negligible, problem for shorter windows** — not a minor rounding difference. Hand-recomputing the 2002 window (a 1-year window) with December CPI instead of the annual average moved the net real return from −30.59% to −30.85%, a 0.26 percentage-point swing large enough to change the published headline. The 2008 window moved by 0.44 points, driven by a genuine, dateable event: the UK's December 2008 VAT cut pulled that December's CPI reading down relative to 2008's own annual average, exaggerating the gap between the two conventions in exactly the way you'd worry about. The effect shrinks to roughly 0.05 points for a 20-year window, but since the same code computes all four window lengths, the December convention is now used uniformly rather than mixing conventions by window length.
 
 ---
 
@@ -106,21 +110,24 @@ This calculation is **pre-tax**. `docs/methodology.md` section 2.2 defines a Tax
 
 ## Headline results (central cost scenario, pre-tax, GBP, net of UK CPI)
 
+**Floor scenario** (ETF bid-ask spread excluded):
+
 | Window | Windows | Median | Worst | Best |
 |---|---|---|---|---|
-| 1 year | 37 | +9.45% `SP500-0050` | −30.59% (2002) `SP500-0051` | +39.52% (1989) `SP500-0052` |
-| 5 years | 33 | +10.71% `SP500-0053` | −7.10% (2000–2004) `SP500-0054` | +24.68% (1995–1999) `SP500-0055` |
-| 10 years | 28 | +8.34% `SP500-0056` | −3.09% (2000–2009) `SP500-0057` | +16.83% (1991–2000) `SP500-0058` |
-| 20 years | 18 | +6.21% `SP500-0059` | +4.53% (1999–2018) `SP500-0060` | +9.18% (2005–2024) `SP500-0061` |
+| 1 year | 37 | +9.65% `SP500-0050` | −30.86% (2002) `SP500-0051` | +39.13% (1989) `SP500-0052` |
+| 5 years | 33 | +10.67% `SP500-0053` | −7.19% (2000–2004) `SP500-0054` | +24.70% (1995–1999) `SP500-0055` |
+| 10 years | 28 | +8.35% `SP500-0056` | −3.18% (2000–2009) `SP500-0057` | +17.08% (1991–2000) `SP500-0058` |
+| 20 years | 18 | +6.25% `SP500-0059` | +4.52% (1999–2018) `SP500-0060` | +9.17% (2005–2024) `SP500-0061` |
 
-The 1-, 5- and 10-year worst windows all correctly land on the dot-com crash and its aftermath (2002; 2000–2004; 2000–2009) — a plausible real-world check, not just an internally-consistent one. Every 20-year window in the sample, even the worst, is real-return-positive.
+**Ceiling scenario** (ETF bid-ask spread included, 0.05% each way): every figure is very slightly worse than its floor equivalent — e.g. the 1-year worst window moves from −30.86% to −30.93%. The gap is small because the spread is a one-off cost, not an annual drag, so it matters less the longer the window. See `results.csv`/`summary.csv` for the `_ceiling` columns; not separately logged in the evidence log, since each `SP500-00xx` claim ID above already states both figures.
+
+The 1-, 5- and 10-year worst windows all correctly land on the dot-com crash and its aftermath (2002; 2000–2004; 2000–2009) — a plausible real-world check, not just an internally-consistent one, independently confirmed by the skeptic review. Every 20-year window in the sample, even the worst and even in the ceiling scenario, is real-return-positive.
 
 ---
 
 ## What this does not do yet
 
-- No skeptic review of this build has happened — it's a first pass, not a checked one.
-- No tax scenario (see above).
-- No sensitivity check on the FX direction assumption (the single biggest risk to correctness here — see "FX timing and direction").
-- Doesn't use an annual-average FX alternative to compare against the year-end convention used.
-- The Bank of England licence question is unresolved (see "Licence status") and is now tracked in `docs/open-research-queue.md`.
+- No tax scenario (see above) — a planned follow-up, not built in this pass.
+- The skeptic review that checked this build could not open the binary Damodaran `.xls` file directly (no code-execution tool in that session) — it cross-checked the compounded multi-year result against an independently-fetched total-return series instead (a close match), rather than verifying each individual year's cell value bit-for-bit. Worth a follow-up if anyone wants that last mile of certainty.
+- Doesn't use an annual-average FX alternative to compare against the year-end convention used (the FX convention itself was independently confirmed correct, just not compared against the alternative).
+- The Bank of England licence question is unresolved (see "Licence status") and is tracked in `docs/open-research-queue.md`.

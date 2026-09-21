@@ -4,15 +4,19 @@ for every available start year, at window lengths of 1, 5, 10 and 20 years.
 
 Data sources (raw files in data/raw/, gitignored, downloaded by
 fetch_raw_data.py — see README.md for URLs, access dates and licence notes):
-  - Damodaran's annual S&P 500 total return series (NYU Stern), 1928-2025.
+  - Damodaran's annual S&P 500 total return AND dividend yield series
+    (NYU Stern), 1928-2025.
   - Bank of England XUDLGBD daily GBP-per-USD spot rate, 1975-present.
   - ONS CPI (D7BT, all items index, 2015=100), December-on-December, 1988-2025.
 
-Every window is computed twice: a "floor" scenario (the ETF bid-ask spread
-excluded, since no source for it was ever found) and a "ceiling" scenario
-(the spread included at its labelled 0.05% sensitivity upper bound, applied
-each way) — per methodology section 3's unsourced-cost sensitivity rule,
-which requires showing both, not just the excluded version. See README.md.
+Every window is computed for two tax scenarios (Sheltered and Taxable, per
+methodology section 2.2) crossed with two cost-sensitivity scenarios (floor:
+ETF bid-ask spread excluded; ceiling: spread included at its labelled 0.05%
+upper bound, per methodology section 3) — four figures per window. See
+README.md for the full method, every assumption, and why the Sheltered
+scenario is the default (no ISA/SIPP-specific costs exist to model; a
+Taxable holding pays CGT on disposal and dividend tax on reinvested income,
+per dossiers/sp500.md section 4).
 
 Usage: python3 costs/benchmark/build_benchmark.py
 Outputs: costs/benchmark/results.csv, costs/benchmark/summary.csv
@@ -48,21 +52,37 @@ ANNUAL_COST_DRAG = ANNUAL_OCF_RATE + ANNUAL_PLATFORM_FEE_RATE  # 0.0032
 # traded value at that point — not an invented central figure either way.
 SPREAD_CEILING_RATE = 0.0005
 
+# Taxable scenario, basic-rate taxpayer, 2026/27 rates — dossiers/sp500.md section 4.
+CGT_RATE = 0.18                    # SP500-0032, basic-rate band
+CGT_ANNUAL_EXEMPT_GBP = 3_000.0    # SP500-0003, applied once at disposal
+DIVIDEND_ALLOWANCE_GBP = 500.0     # SP500-0034, applied fresh each tax year
+DIVIDEND_TAX_RATE = 0.1075         # SP500-0035, basic rate
 
-def load_damodaran_returns(xls_path):
-    """Return {year: annual USD total return (decimal)} from the Damodaran workbook."""
+
+def load_damodaran_returns_and_yields(xls_path):
+    """Return two dicts, {year: total return} and {year: dividend yield}, both
+    decimal, from the Damodaran workbook's own two sheets."""
     import pandas as pd
 
-    df = pd.read_excel(xls_path, sheet_name="Returns by year", header=19)
-    df = df[["Year", "S&P 500 (includes dividends)"]].dropna()
+    returns_df = pd.read_excel(xls_path, sheet_name="Returns by year", header=19)
+    returns_df = returns_df[["Year", "S&P 500 (includes dividends)"]].dropna()
     returns = {}
-    for _, row in df.iterrows():
+    for _, row in returns_df.iterrows():
         year_raw = row["Year"]
         if not isinstance(year_raw, (int, float)):
             continue  # skip summary rows like "1928-2025"
-        year = int(year_raw)
-        returns[year] = float(row["S&P 500 (includes dividends)"])
-    return returns
+        returns[int(year_raw)] = float(row["S&P 500 (includes dividends)"])
+
+    yields_df = pd.read_excel(xls_path, sheet_name="S&P 500 & Raw Data", header=1)
+    yields_df = yields_df[["Year", "Dividend Yield"]].dropna()
+    yields = {}
+    for _, row in yields_df.iterrows():
+        year_raw = row["Year"]
+        if not isinstance(year_raw, (int, float)):
+            continue
+        yields[int(year_raw)] = float(row["Dividend Yield"])
+
+    return returns, yields
 
 
 def load_boe_year_end_rates(html_path):
@@ -118,76 +138,149 @@ def load_ons_december_cpi(csv_path):
     return cpi
 
 
-def compute_window(start_year, length, damodaran, fx, cpi):
+def _sheltered_scenario(usd_growth, rate_start, rate_end, spread_rate):
+    """No tax deducted — an ISA/SIPP holding. Returns (total_cash_in, net_proceeds)."""
+    invested_usd = ILLUSTRATIVE_LUMP_SUM_GBP / rate_start
+    grown_usd = invested_usd * usd_growth
+    grown_gbp = grown_usd * rate_end
+
+    total_cash_in = ILLUSTRATIVE_LUMP_SUM_GBP * (1 + spread_rate) + BUY_COMMISSION_GBP
+    net_proceeds = grown_gbp * (1 - spread_rate) - SELL_COMMISSION_GBP
+    return total_cash_in, net_proceeds
+
+
+def _taxable_scenario(start_year, end_year, damodaran, yields, fx, spread_rate):
+    """A basic-rate taxpayer holding outside a wrapper, per dossiers/sp500.md
+    section 4.1. CGT on disposal, dividend tax on the notional distribution
+    each year (an accumulating fund reinvests dividends, but HMRC still
+    taxes them as income when they arise — HMRC CG57707, already cited in
+    dossiers/sp500.md), with the taxed amount added to the CGT cost basis to
+    avoid double taxation on eventual disposal.
+
+    Each year's total return is split into a dividend/income component
+    (Damodaran's own published dividend yield for that year) and a residual
+    price/capital-gain component (total return minus dividend yield) — a
+    standard approximation, not an exact decomposition. See README.md "Tax
+    scenarios" for the full reasoning and its limitations.
+
+    Returns (total_cash_in, net_proceeds).
+    """
+    rate_start = fx[start_year - 1]
+    invested_usd = ILLUSTRATIVE_LUMP_SUM_GBP / rate_start
+    value_usd = invested_usd
+
+    cumulative_dividend_tax_gbp = 0.0
+    cumulative_cost_basis_addition_gbp = 0.0
+
+    for y in range(start_year, end_year + 1):
+        dividend_yield_y = yields.get(y, 0.0)
+        notional_dividend_usd = value_usd * dividend_yield_y
+
+        # Grow the whole position (price + reinvested dividend), net of ongoing costs —
+        # the fund itself reinvests automatically; only the tax treatment is separate.
+        value_usd = value_usd * (1 + damodaran[y]) * (1 - ANNUAL_COST_DRAG)
+
+        # The notional distribution is taxed as income in the year it arises, converted
+        # to GBP at that year's own year-end rate (a real, dated conversion, not the
+        # window's endpoint rate) — dividend tax is a real annual event, not a one-off.
+        dividend_gbp = notional_dividend_usd * fx[y]
+        taxable_dividend = max(0.0, dividend_gbp - DIVIDEND_ALLOWANCE_GBP)
+        cumulative_dividend_tax_gbp += taxable_dividend * DIVIDEND_TAX_RATE
+        # HMRC CG57707: the notional distribution is allowable expenditure (added to cost
+        # basis) where it is subject to Income Tax — i.e. the taxed portion, not the
+        # allowance-covered portion.
+        cumulative_cost_basis_addition_gbp += taxable_dividend
+
+    rate_end = fx[end_year]
+    grown_gbp = value_usd * rate_end
+
+    total_cash_in = ILLUSTRATIVE_LUMP_SUM_GBP * (1 + spread_rate) + BUY_COMMISSION_GBP
+    gross_proceeds = grown_gbp * (1 - spread_rate) - SELL_COMMISSION_GBP
+
+    adjusted_cost_basis = total_cash_in + cumulative_cost_basis_addition_gbp
+    chargeable_gain = max(
+        0.0, (gross_proceeds - adjusted_cost_basis) - CGT_ANNUAL_EXEMPT_GBP
+    )
+    cgt_due = chargeable_gain * CGT_RATE
+
+    net_proceeds = gross_proceeds - cgt_due - cumulative_dividend_tax_gbp
+    return total_cash_in, net_proceeds
+
+
+def compute_window(start_year, length, damodaran, yields, fx, cpi):
     """Compute one (start_year, length) window. Returns a dict, or None if data is missing."""
     end_year = start_year + length - 1
-    years_needed = range(start_year, end_year + 1)
+    years_needed = list(range(start_year, end_year + 1))
 
     if any(y not in damodaran for y in years_needed):
         return None
-    if (start_year - 1) not in fx or end_year not in fx:
+    if (start_year - 1) not in fx or any(y not in fx for y in years_needed):
         return None
     if (start_year - 1) not in cpi or end_year not in cpi:
         return None
 
-    # 1. Cost-adjusted USD growth factor, compounded year by year (spread not yet applied).
     usd_growth = 1.0
     for y in years_needed:
         usd_growth *= (1 + damodaran[y]) * (1 - ANNUAL_COST_DRAG)
 
-    # 2. FX conversion: buy at end-of-(start_year-1) rate, sell at end-of-end_year rate.
-    #    Rate is GBP per USD (see README "FX timing and direction").
     rate_start = fx[start_year - 1]
     rate_end = fx[end_year]
 
-    invested_gbp = ILLUSTRATIVE_LUMP_SUM_GBP
-    invested_usd = invested_gbp / rate_start
-    grown_usd = invested_usd * usd_growth
-    grown_gbp = grown_usd * rate_end
-
-    # 3. Deflate by December-on-December CPI inflation over the same window.
     cpi_start = cpi[start_year - 1]
     cpi_end = cpi[end_year]
     avg_annual_inflation = (cpi_end / cpi_start) ** (1 / length) - 1
 
-    def scenario(spread_rate):
-        total_cash_in = ILLUSTRATIVE_LUMP_SUM_GBP * (1 + spread_rate) + BUY_COMMISSION_GBP
-        net_proceeds = grown_gbp * (1 - spread_rate) - SELL_COMMISSION_GBP
-        nominal = (net_proceeds / total_cash_in) ** (1 / length) - 1
-        real = (1 + nominal) / (1 + avg_annual_inflation) - 1
-        return round(total_cash_in, 2), round(net_proceeds, 2), nominal, real
-
-    floor_cash_in, floor_proceeds, floor_nominal, floor_real = scenario(0.0)
-    ceiling_cash_in, ceiling_proceeds, ceiling_nominal, ceiling_real = scenario(SPREAD_CEILING_RATE)
-
-    return {
+    result = {
         "start_year": start_year,
         "end_year": end_year,
         "window_length": length,
         "fx_rate_start": rate_start,
         "fx_rate_end": rate_end,
         "avg_annual_inflation": avg_annual_inflation,
-        "total_cash_in_gbp_floor": floor_cash_in,
-        "net_proceeds_gbp_floor": floor_proceeds,
-        "nominal_annual_return_floor": floor_nominal,
-        "net_real_return_floor": floor_real,
-        "total_cash_in_gbp_ceiling": ceiling_cash_in,
-        "net_proceeds_gbp_ceiling": ceiling_proceeds,
-        "nominal_annual_return_ceiling": ceiling_nominal,
-        "net_real_return_ceiling": ceiling_real,
     }
 
+    for spread_label, spread_rate in (("floor", 0.0), ("ceiling", SPREAD_CEILING_RATE)):
+        sheltered_cash_in, sheltered_proceeds = _sheltered_scenario(
+            usd_growth, rate_start, rate_end, spread_rate
+        )
+        sheltered_nominal = (sheltered_proceeds / sheltered_cash_in) ** (1 / length) - 1
+        sheltered_real = (1 + sheltered_nominal) / (1 + avg_annual_inflation) - 1
 
-def build_results(damodaran, fx, cpi):
+        taxable_cash_in, taxable_proceeds = _taxable_scenario(
+            start_year, end_year, damodaran, yields, fx, spread_rate
+        )
+        taxable_nominal = (taxable_proceeds / taxable_cash_in) ** (1 / length) - 1
+        taxable_real = (1 + taxable_nominal) / (1 + avg_annual_inflation) - 1
+
+        result[f"sheltered_total_cash_in_gbp_{spread_label}"] = round(sheltered_cash_in, 2)
+        result[f"sheltered_net_proceeds_gbp_{spread_label}"] = round(sheltered_proceeds, 2)
+        result[f"sheltered_nominal_annual_return_{spread_label}"] = sheltered_nominal
+        result[f"sheltered_net_real_return_{spread_label}"] = sheltered_real
+
+        result[f"taxable_total_cash_in_gbp_{spread_label}"] = round(taxable_cash_in, 2)
+        result[f"taxable_net_proceeds_gbp_{spread_label}"] = round(taxable_proceeds, 2)
+        result[f"taxable_nominal_annual_return_{spread_label}"] = taxable_nominal
+        result[f"taxable_net_real_return_{spread_label}"] = taxable_real
+
+    return result
+
+
+def build_results(damodaran, yields, fx, cpi):
     results = []
     min_year = min(damodaran)
     max_year = max(damodaran)
     for length in WINDOW_LENGTHS:
         for start_year in range(min_year, max_year - length + 2):
-            row = compute_window(start_year, length, damodaran, fx, cpi)
+            row = compute_window(start_year, length, damodaran, yields, fx, cpi)
             if row is not None:
                 results.append(row)
     return results
+
+
+SCENARIOS = [
+    ("sheltered", "floor"), ("sheltered", "ceiling"),
+    ("taxable", "floor"), ("taxable", "ceiling"),
+]
 
 
 def build_summary(results):
@@ -201,19 +294,20 @@ def build_summary(results):
         if not rows:
             continue
         summary_row = {"window_length": length, "n_windows": len(rows)}
-        for scenario in ("floor", "ceiling"):
-            key = f"net_real_return_{scenario}"
+        for tax, spread in SCENARIOS:
+            key = f"{tax}_net_real_return_{spread}"
+            prefix = f"{tax}_{spread}"
             rows_sorted = sorted(rows, key=lambda r: r[key])
             worst = rows_sorted[0]
             best = rows_sorted[-1]
             med = median(r[key] for r in rows)
-            summary_row[f"median_net_real_return_{scenario}"] = med
-            summary_row[f"worst_net_real_return_{scenario}"] = worst[key]
-            summary_row[f"worst_start_year_{scenario}"] = worst["start_year"]
-            summary_row[f"worst_end_year_{scenario}"] = worst["end_year"]
-            summary_row[f"best_net_real_return_{scenario}"] = best[key]
-            summary_row[f"best_start_year_{scenario}"] = best["start_year"]
-            summary_row[f"best_end_year_{scenario}"] = best["end_year"]
+            summary_row[f"median_net_real_return_{prefix}"] = med
+            summary_row[f"worst_net_real_return_{prefix}"] = worst[key]
+            summary_row[f"worst_start_year_{prefix}"] = worst["start_year"]
+            summary_row[f"worst_end_year_{prefix}"] = worst["end_year"]
+            summary_row[f"best_net_real_return_{prefix}"] = best[key]
+            summary_row[f"best_start_year_{prefix}"] = best["start_year"]
+            summary_row[f"best_end_year_{prefix}"] = best["end_year"]
         summary.append(summary_row)
     return summary
 
@@ -222,11 +316,13 @@ def write_results_csv(results, path):
     fieldnames = [
         "start_year", "end_year", "window_length", "fx_rate_start", "fx_rate_end",
         "avg_annual_inflation",
-        "total_cash_in_gbp_floor", "net_proceeds_gbp_floor",
-        "nominal_annual_return_floor", "net_real_return_floor",
-        "total_cash_in_gbp_ceiling", "net_proceeds_gbp_ceiling",
-        "nominal_annual_return_ceiling", "net_real_return_ceiling",
     ]
+    for tax, spread in SCENARIOS:
+        prefix = f"{tax}_{spread}"
+        fieldnames += [
+            f"{tax}_total_cash_in_gbp_{spread}", f"{tax}_net_proceeds_gbp_{spread}",
+            f"{tax}_nominal_annual_return_{spread}", f"{tax}_net_real_return_{spread}",
+        ]
     with path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -236,11 +332,12 @@ def write_results_csv(results, path):
 
 def write_summary_csv(summary, path):
     fieldnames = ["window_length", "n_windows"]
-    for scenario in ("floor", "ceiling"):
+    for tax, spread in SCENARIOS:
+        prefix = f"{tax}_{spread}"
         fieldnames += [
-            f"median_net_real_return_{scenario}",
-            f"worst_net_real_return_{scenario}", f"worst_start_year_{scenario}", f"worst_end_year_{scenario}",
-            f"best_net_real_return_{scenario}", f"best_start_year_{scenario}", f"best_end_year_{scenario}",
+            f"median_net_real_return_{prefix}",
+            f"worst_net_real_return_{prefix}", f"worst_start_year_{prefix}", f"worst_end_year_{prefix}",
+            f"best_net_real_return_{prefix}", f"best_start_year_{prefix}", f"best_end_year_{prefix}",
         ]
     with path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -255,11 +352,11 @@ def main():
             print(f"ERROR: missing raw data file {path} — run fetch_raw_data.py first", file=sys.stderr)
             return 1
 
-    damodaran = load_damodaran_returns(DAMODARAN_XLS)
+    damodaran, yields = load_damodaran_returns_and_yields(DAMODARAN_XLS)
     fx = load_boe_year_end_rates(BOE_HTML)
     cpi = load_ons_december_cpi(ONS_CSV)
 
-    results = build_results(damodaran, fx, cpi)
+    results = build_results(damodaran, yields, fx, cpi)
     summary = build_summary(results)
 
     write_results_csv(results, BENCHMARK_DIR / "results.csv")
@@ -269,13 +366,14 @@ def main():
     print(f"Wrote {len(summary)} summary row(s) to summary.csv")
     for row in summary:
         print(f"  {row['window_length']:2d}yr ({row['n_windows']} windows):")
-        for scenario in ("floor", "ceiling"):
+        for tax, spread in SCENARIOS:
+            prefix = f"{tax}_{spread}"
             print(
-                f"    {scenario:8s}: median {row[f'median_net_real_return_{scenario}']:+.2%}, "
-                f"worst {row[f'worst_net_real_return_{scenario}']:+.2%} "
-                f"({row[f'worst_start_year_{scenario}']}-{row[f'worst_end_year_{scenario}']}), "
-                f"best {row[f'best_net_real_return_{scenario}']:+.2%} "
-                f"({row[f'best_start_year_{scenario}']}-{row[f'best_end_year_{scenario}']})"
+                f"    {tax:9s}/{spread:8s}: median {row[f'median_net_real_return_{prefix}']:+.2%}, "
+                f"worst {row[f'worst_net_real_return_{prefix}']:+.2%} "
+                f"({row[f'worst_start_year_{prefix}']}-{row[f'worst_end_year_{prefix}']}), "
+                f"best {row[f'best_net_real_return_{prefix}']:+.2%} "
+                f"({row[f'best_start_year_{prefix}']}-{row[f'best_end_year_{prefix}']})"
             )
     return 0
 

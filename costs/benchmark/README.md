@@ -1,8 +1,8 @@
 # S&P 500 GBP benchmark calculation
 
-**Status:** second build, after one skeptic review. Not published — every figure below is `status: draft` in the evidence log. See `reviews/benchmark-review-2026-09-21.md` for the full review; this README reflects the fixes made in response to it (December-on-December CPI, and the dual-sided spread sensitivity below) — the FX direction and year-end selection were both independently checked and confirmed correct, no change needed there.
+**Status:** third build, after one skeptic review. Not published — every figure below is `status: draft` in the evidence log. See `reviews/benchmark-review-2026-09-21.md` for the full review; this README reflects the fixes made in response to it (December-on-December CPI, and the dual-sided spread sensitivity below) — the FX direction and year-end selection were both independently checked and confirmed correct, no change needed there. This build also adds a second tax scenario (see "Tax scenarios" below): every result is now computed once as **Sheltered** (an ISA/SIPP holding, no UK tax) and once as **Taxable** (a basic-rate UK taxpayer holding outside a wrapper), per `docs/methodology.md` section 2.2.
 
-This computes the S&P 500 global-shares benchmark's nominal, cost-adjusted and net real return, in GBP, for a UK investor, per `docs/methodology.md`'s "public-data benchmark chain" decision (Damodaran + Bank of England + ONS, Decisions log 19 Sep 2026). It reproduces the calculation for every available rolling window at four lengths (1, 5, 10, 20 years), per methodology section 4.
+This computes the S&P 500 global-shares benchmark's nominal, cost-adjusted and net real return, in GBP, for a UK investor, per `docs/methodology.md`'s "public-data benchmark chain" decision (Damodaran + Bank of England + ONS, Decisions log 19 Sep 2026). It reproduces the calculation for every available rolling window at four lengths (1, 5, 10, 20 years), per methodology section 4, for both the Sheltered and Taxable scenarios (methodology section 2.2).
 
 ---
 
@@ -11,10 +11,10 @@ This computes the S&P 500 global-shares benchmark's nominal, cost-adjusted and n
 | File | What it is |
 |---|---|
 | `fetch_raw_data.py` | Downloads the three raw source files into `data/raw/` (gitignored). Re-running it refreshes the data. |
-| `build_benchmark.py` | Loads the raw files, computes every window, writes `results.csv` and `summary.csv`. |
-| `results.csv` | Every window: start year, end year, window length, FX rates used, cash flows, nominal return, average inflation, net real return. |
-| `summary.csv` | For each window length: number of windows, median/worst/best net real return, and which years the worst/best windows cover. |
-| `test_benchmark.py` | Unit tests, including three independently hand-calculated windows. |
+| `build_benchmark.py` | Loads the raw files, computes every window in both tax scenarios, writes `results.csv` and `summary.csv`. |
+| `results.csv` | Every window: start year, end year, window length, FX rates used, average inflation, then `sheltered_*` and `taxable_*` cash flows, nominal return and net real return (each with `_floor`/`_ceiling` spread variants). |
+| `summary.csv` | For each window length: number of windows, then median/worst/best net real return (and the years it covers) for each of the four `sheltered`/`taxable` × `floor`/`ceiling` combinations. |
+| `test_benchmark.py` | Unit tests, including three independently hand-calculated windows covering both tax scenarios. |
 
 Run in order: `python3 fetch_raw_data.py`, then `python3 build_benchmark.py`, then `python3 test_benchmark.py` to check it.
 
@@ -41,10 +41,11 @@ For a window starting in year `Y` and running `N` years (to year `Y+N-1`):
 1. **USD growth.** Compound each year's Damodaran S&P 500 total return, `Y` to `Y+N-1`, applying the central annual cost drag to each year (see "Cost assumptions" below): `usd_growth = Π (1 + return_t) × (1 - annual_cost_drag)`.
 2. **Currency conversion.** Convert an illustrative £10,000 lump sum to USD at the **year-end rate for `Y-1`** (i.e. the rate just before the window starts), grow it in USD, then convert the result back to GBP at the **year-end rate for `Y+N-1`** (the window's last year). See "FX timing and direction" below for why endpoints, not a rate applied every year, give the same answer.
 3. **One-off costs.** Total cash in = £10,000 + a buying commission. Net proceeds = the grown, converted amount, minus a selling commission.
-4. **Nominal annual return** = `(net proceeds / total cash in) ^ (1/N) − 1`, per `docs/methodology.md` section 1.2.
-5. **Net real return** = deflate the nominal return by the average annual CPI inflation over the same window (`(CPI_{Y+N-1} / CPI_{Y-1}) ^ (1/N) − 1`, using December-on-December CPI — see "Inflation" below), per methodology section 1.2 step 4.
+4. **Tax.** In the **Sheltered** scenario, steps 1–3 are the whole story — no tax is deducted. In the **Taxable** scenario, UK Capital Gains Tax and dividend tax are applied instead — see "Tax scenarios" below for the full method.
+5. **Nominal annual return** = `(net proceeds / total cash in) ^ (1/N) − 1`, per `docs/methodology.md` section 1.2.
+6. **Net real return** = deflate the nominal return by the average annual CPI inflation over the same window (`(CPI_{Y+N-1} / CPI_{Y-1}) ^ (1/N) − 1`, using December-on-December CPI — see "Inflation" below), per methodology section 1.2 step 4.
 
-Steps 1–5 are run **twice** per window — once excluding the ETF bid-ask spread cost, once including it at its labelled sensitivity upper bound — see "Cost assumptions" below.
+Steps 1–6 are run **four times** per window — Sheltered and Taxable, each once excluding the ETF bid-ask spread cost and once including it at its labelled sensitivity upper bound — see "Cost assumptions" below.
 
 This is done for **every start year the data supports**, per methodology's rolling-window rule (section 4, item 2) — not a hand-picked date.
 
@@ -102,15 +103,30 @@ A longer USD-only or GBP-only history exists further back (Damodaran to 1928, Bo
 
 ---
 
-## No tax modelled
+## Tax scenarios
 
-This calculation is **pre-tax**. `docs/methodology.md` section 2.2 defines a Taxable and a Sheltered scenario, and `dossiers/sp500.md` section 4 already documents UK CGT, dividend tax and ISA/SIPP shelter rules in detail — none of that is applied here. Adding a tax scenario is a natural next step, not done in this pass.
+`docs/methodology.md` section 2.2 defines two scenarios; this build computes both, for every window.
+
+**Sheltered** is an ISA or SIPP holding. No UK tax applies to gains or income inside either wrapper, so this is just steps 1–3 above, with nothing further deducted. Per the methodology's Decisions log (17 Sep 2026), **Taxable is the default scenario for published headlines, with Sheltered shown alongside** — this build now computes both for every window, so that decision can be honoured once anything here is published; nothing here is published yet, everything is still `status: draft`.
+
+**Taxable** is the same holding, same platform, same fund, held outside any wrapper, for a **basic-rate UK taxpayer only** (higher- and additional-rate taxpayers, and anyone whose gains/income interact with other income in the same tax year, are out of scope — see limitations below). Two UK taxes apply, both already evidence-logged in `dossiers/sp500.md` section 4:
+
+1. **Dividend tax on the notional distribution, every year it arises.** An accumulating ETF reinvests its dividends automatically rather than paying them out, but HMRC does not treat that as tax-free: HMRC's Capital Gains Manual, CG57707, states the notional distribution "is treated as allowable expenditure where it is subject to Income Tax in the hands of the unit holder" — i.e. it's taxed as income in the year it arises, exactly as if it had been paid out and reinvested by hand. This build approximates each year's dividend using **Damodaran's own published annual dividend yield** for the S&P 500 (from the same workbook as the total-return series, so no separate source was needed), applied to that year's opening USD position — a standard yield/price-return split, not an exact per-security decomposition. The notional dividend is converted to GBP at **that year's own year-end FX rate** (not the window's start or end rate — dividend tax is a real, dated annual event, not a one-off), then taxed at **10.75%** (`SP500-0035`, basic rate) on the amount above the **£500 annual dividend allowance** (`SP500-0034`), reapplied fresh every tax year.
+2. **Capital Gains Tax at disposal, once, at the end of the window.** The whole gain (final GBP proceeds minus the original cost) is taxed at **18%** (`SP500-0032`, basic-rate band) above the **£3,000 annual CGT exempt amount** (`SP500-0003`), applied once at the single disposal event this calculation models (a lump sum bought once and sold once, not repeated annual disposals). Per CG57707, the portion of each year's notional dividend that was actually taxed as income is added to the CGT cost basis before this calculation, so the same money is never taxed twice — once as income, then again as a capital gain on disposal.
+
+**A genuinely correct edge case, not a bug:** several windows above (e.g. the 1-year window starting 2002, and multiple 5- and 10-year worst windows) show **identical** Sheltered and Taxable results. This happens when a window's notional dividend income stays under the £500 allowance in every year *and* the window ends at a loss (so CGT floors at zero, per the exempt-amount rule) — at this build's £10,000 illustrative lump sum, dividend income alone rarely exceeds £500/year even after some compounding, so the tax drag in most windows is driven almost entirely by CGT on the accumulated capital gain at disposal, not by the annual dividend tax. This was checked by hand for the 2002 window: that year's dividend yield (≈1.40%) on the position's opening value converts to roughly £127 — under the £500 allowance — and 2002 was itself a loss year, so both taxes are genuinely zero, not omitted.
+
+**Known limitations, not modelled:**
+- Higher-rate (35.75%, `SP500-0036`) and additional-rate (39.35%, `SP500-0037`) taxpayers — basic rate only.
+- Interaction with the holder's other income, gains, or allowances used elsewhere in the same tax year (this scenario assumes the full £500 dividend allowance and £3,000 CGT exempt amount are available every year, which won't be true for every real investor).
+- Multiple smaller disposals, or Bed & ISA / Bed & SIPP transfers, which change the CGT timing entirely — this models one lump sum, bought once and sold once.
+- Any change to these rates or thresholds between the 2026/27 figures used here and the year an investor actually held the position (the rates are today's, applied uniformly across history, same limitation already disclosed for costs above).
 
 ---
 
-## Headline results (central cost scenario, pre-tax, GBP, net of UK CPI)
+## Headline results (central cost scenario, GBP, net of UK CPI)
 
-**Floor scenario** (ETF bid-ask spread excluded):
+**Sheltered scenario (ISA/SIPP, no UK tax), floor spread** (ETF bid-ask spread excluded):
 
 | Window | Windows | Median | Worst | Best |
 |---|---|---|---|---|
@@ -119,15 +135,26 @@ This calculation is **pre-tax**. `docs/methodology.md` section 2.2 defines a Tax
 | 10 years | 28 | +8.35% `SP500-0056` | −3.18% (2000–2009) `SP500-0057` | +17.08% (1991–2000) `SP500-0058` |
 | 20 years | 18 | +6.25% `SP500-0059` | +4.52% (1999–2018) `SP500-0060` | +9.17% (2005–2024) `SP500-0061` |
 
-**Ceiling scenario** (ETF bid-ask spread included, 0.05% each way): every figure is very slightly worse than its floor equivalent — e.g. the 1-year worst window moves from −30.86% to −30.93%. The gap is small because the spread is a one-off cost, not an annual drag, so it matters less the longer the window. See `results.csv`/`summary.csv` for the `_ceiling` columns; not separately logged in the evidence log, since each `SP500-00xx` claim ID above already states both figures.
+**Taxable scenario (basic-rate UK taxpayer), floor spread:**
 
-The 1-, 5- and 10-year worst windows all correctly land on the dot-com crash and its aftermath (2002; 2000–2004; 2000–2009) — a plausible real-world check, not just an internally-consistent one, independently confirmed by the skeptic review. Every 20-year window in the sample, even the worst and even in the ceiling scenario, is real-return-positive.
+| Window | Windows | Median | Worst | Best |
+|---|---|---|---|---|
+| 1 year | 37 | +9.65% `SP500-0062` | −30.86% (2002) `SP500-0063` | +36.26% (1989) `SP500-0064` |
+| 5 years | 33 | +9.33% `SP500-0065` | −7.19% (2000–2004) `SP500-0066` | +21.84% (1995–1999) `SP500-0067` |
+| 10 years | 28 | +7.30% `SP500-0068` | −3.18% (2000–2009) `SP500-0069` | +15.31% (1991–2000) `SP500-0070` |
+| 20 years | 18 | +5.51% `SP500-0071` | +3.88% (1999–2018) `SP500-0072` | +8.26% (2005–2024) `SP500-0073` |
+
+**Ceiling scenario** (ETF bid-ask spread included, 0.05% each way), both tax scenarios: every figure is very slightly worse than its floor equivalent — e.g. the Sheltered 1-year worst window moves from −30.86% to −30.93%. The gap is small because the spread is a one-off cost, not an annual drag, so it matters less the longer the window. See `results.csv`/`summary.csv` for the `_ceiling` columns; not separately logged in the evidence log, since each `SP500-00xx` claim ID above already states both figures.
+
+The 1-, 5- and 10-year worst windows all correctly land on the dot-com crash and its aftermath (2002; 2000–2004; 2000–2009) — a plausible real-world check, not just an internally-consistent one, independently confirmed by the skeptic review. Every 20-year window in the sample, even the worst, even in the ceiling scenario, and even after basic-rate UK tax, is real-return-positive.
+
+The median and worst windows are identical between Sheltered and Taxable at several window lengths — this is a real result of this build's £10,000 illustrative lump sum, not a bug; see "Tax scenarios" below for why. The Taxable "best" windows diverge more clearly from Sheltered, since a large capital gain is exactly what triggers CGT.
 
 ---
 
 ## What this does not do yet
 
-- No tax scenario (see above) — a planned follow-up, not built in this pass.
-- The skeptic review that checked this build could not open the binary Damodaran `.xls` file directly (no code-execution tool in that session) — it cross-checked the compounded multi-year result against an independently-fetched total-return series instead (a close match), rather than verifying each individual year's cell value bit-for-bit. Worth a follow-up if anyone wants that last mile of certainty.
+- The Taxable scenario only models a basic-rate taxpayer, one lump-sum purchase and one disposal, with no interaction with the holder's other income or gains — see "Tax scenarios" above for the full list of what's excluded.
+- The skeptic review that checked this build could not open the binary Damodaran `.xls` file directly (no code-execution tool in that session) — it cross-checked the compounded multi-year result against an independently-fetched total-return series instead (a close match), rather than verifying each individual year's cell value bit-for-bit. Worth a follow-up if anyone wants that last mile of certainty. The new dividend-yield column (used for the Taxable scenario) has not yet had its own independent skeptic check.
 - Doesn't use an annual-average FX alternative to compare against the year-end convention used (the FX convention itself was independently confirmed correct, just not compared against the alternative).
 - The Bank of England licence question is unresolved (see "Licence status") and is tracked in `docs/open-research-queue.md`.

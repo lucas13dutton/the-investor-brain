@@ -9,6 +9,7 @@
 *.duckdb.wal
 data/raw/
 data/cache/
+asset-theory-comparison-engine.xlsx
 
 # Python
 __pycache__/

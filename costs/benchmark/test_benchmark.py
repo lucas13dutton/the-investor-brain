@@ -43,24 +43,35 @@ CPI_DECEMBER = {
     2009: 88.0, 2010: 91.2, 2014: 100.1, 2019: 108.5, 2020: 109.2, 2021: 115.1,
 }
 
-COST_DRAG = bb.ANNUAL_OCF_RATE + bb.ANNUAL_PLATFORM_FEE_RATE  # 0.0007 + 0.0025 = 0.0032
+# A skeptic review (2026-09-24) found the previous flat COST_DRAG = OCF + platform
+# fee (0.0032, applied uncapped every year) silently ignored AJ Bell's real £42/year
+# platform-fee cap (SP500-0013) once the position compounds past ~£16,800 in GBP —
+# see reviews/benchmark-review-2026-09-24.md Finding 1. These hand-calculation
+# helpers are rewritten to apply that cap independently (not by calling
+# build_benchmark._grow_one_year, which would defeat the point of a hand check),
+# so they keep genuinely validating the module rather than re-agreeing with it.
+PLATFORM_FEE_CAP_GBP = 42.00
+
+
+def _hand_grow_one_year(value_usd, year, damodaran, fx):
+    value_usd = value_usd * (1 + damodaran[year]) * (1 - bb.ANNUAL_OCF_RATE)
+    gbp_value = value_usd * fx[year]
+    fee_gbp = min(bb.ANNUAL_PLATFORM_FEE_RATE * gbp_value, PLATFORM_FEE_CAP_GBP)
+    return (gbp_value - fee_gbp) / fx[year]
 
 
 def hand_calculate_sheltered(start_year, length, damodaran, fx, cpi, spread_rate):
     """Independent formula for the Sheltered (no tax) scenario."""
     end_year = start_year + length - 1
 
-    usd_growth = 1.0
-    for y in range(start_year, end_year + 1):
-        usd_growth = usd_growth * (1 + damodaran[y]) * (1 - COST_DRAG)
-
     rate_start = fx[start_year - 1]
-    rate_end = fx[end_year]
-
     lump_sum = 10_000.0
-    invested_usd = lump_sum / rate_start
-    grown_usd = invested_usd * usd_growth
-    grown_gbp = grown_usd * rate_end
+    value_usd = lump_sum / rate_start
+    for y in range(start_year, end_year + 1):
+        value_usd = _hand_grow_one_year(value_usd, y, damodaran, fx)
+
+    rate_end = fx[end_year]
+    grown_gbp = value_usd * rate_end
 
     total_cash_in = lump_sum * (1 + spread_rate) + 5.00
     net_proceeds = grown_gbp * (1 - spread_rate) - 5.00
@@ -88,9 +99,9 @@ def hand_calculate_taxable(start_year, length, damodaran, yields, fx, cpi):
     cost_basis_addition_gbp = 0.0
 
     for y in range(start_year, end_year + 1):
-        div_yield = yields.get(y, 0.0)
+        div_yield = yields[y]
         notional_dividend_usd = value_usd * div_yield
-        value_usd = value_usd * (1 + damodaran[y]) * (1 - COST_DRAG)
+        value_usd = _hand_grow_one_year(value_usd, y, damodaran, fx)
 
         dividend_gbp = notional_dividend_usd * fx[y]
         taxable_dividend = max(0.0, dividend_gbp - 500.0)

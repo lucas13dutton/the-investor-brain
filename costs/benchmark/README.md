@@ -1,6 +1,6 @@
 # S&P 500 GBP benchmark calculation
 
-**Status:** third build, after one skeptic review. Not published — every figure below is `status: draft` in the evidence log. See `reviews/benchmark-review-2026-09-21.md` for the full review; this README reflects the fixes made in response to it (December-on-December CPI, and the dual-sided spread sensitivity below) — the FX direction and year-end selection were both independently checked and confirmed correct, no change needed there. This build also adds a second tax scenario (see "Tax scenarios" below): every result is now computed once as **Sheltered** (an ISA/SIPP holding, no UK tax) and once as **Taxable** (a basic-rate UK taxpayer holding outside a wrapper), per `docs/methodology.md` section 2.2.
+**Status:** fourth build, after two skeptic reviews. Not published — every figure below is `status: draft` in the evidence log. See `reviews/benchmark-review-2026-09-21.md` for the first review (December-on-December CPI; the dual-sided spread sensitivity — both fixed in the third build) and `reviews/benchmark-review-2026-09-24.md` for the second, which independently re-fetched all three raw sources, reproduced `results.csv`/`summary.csv` byte-for-byte from an unmodified copy of `build_benchmark.py`, and hand-verified 2002, 2008 and 2000–2009 to 16 significant figures — but also found a new, quantified bug: the AJ Bell platform-fee cap (`SP500-0013`) was documented as never binding but was never actually implemented, and every published **best-case** 5/10/20-year headline was too pessimistic as a result. This build fixes that — see "Cost assumptions" below. The FX direction and year-end selection, and the CPI/spread fixes from the first review, were all independently re-confirmed in the second review and needed no further change. This build also adds a second tax scenario (see "Tax scenarios" below): every result is now computed once as **Sheltered** (an ISA/SIPP holding, no UK tax) and once as **Taxable** (a basic-rate UK taxpayer holding outside a wrapper), per `docs/methodology.md` section 2.2.
 
 This computes the S&P 500 global-shares benchmark's nominal, cost-adjusted and net real return, in GBP, for a UK investor, per `docs/methodology.md`'s "public-data benchmark chain" decision (Damodaran + Bank of England + ONS, Decisions log 19 Sep 2026). It reproduces the calculation for every available rolling window at four lengths (1, 5, 10, 20 years), per methodology section 4, for both the Sheltered and Taxable scenarios (methodology section 2.2).
 
@@ -40,8 +40,8 @@ Damodaran's and ONS's data are both clearly and permissively licensed (Damodaran
 
 For a window starting in year `Y` and running `N` years (to year `Y+N-1`):
 
-1. **USD growth.** Compound each year's Damodaran S&P 500 total return, `Y` to `Y+N-1`, applying the central annual cost drag to each year (see "Cost assumptions" below): `usd_growth = Π (1 + return_t) × (1 - annual_cost_drag)`.
-2. **Currency conversion.** Convert an illustrative £10,000 lump sum to USD at the **year-end rate for `Y-1`** (i.e. the rate just before the window starts), grow it in USD, then convert the result back to GBP at the **year-end rate for `Y+N-1`** (the window's last year). See "FX timing and direction" below for why endpoints, not a rate applied every year, give the same answer.
+1. **USD growth.** Compound each year's Damodaran S&P 500 total return, `Y` to `Y+N-1`, applying the fund's OCF each year (a pure percentage) and AJ Bell's platform fee each year (0.25% of the position's GBP value, **capped at £42/year** — see "Cost assumptions" below for why this now needs a per-year GBP conversion, not just the two endpoints).
+2. **Currency conversion.** Convert an illustrative £10,000 lump sum to USD at the **year-end rate for `Y-1`** (i.e. the rate just before the window starts), grow it in USD (converting to GBP and back *each year*, only to check the platform-fee cap — see "FX timing and direction" below), then convert the final result back to GBP at the **year-end rate for `Y+N-1`** (the window's last year).
 3. **One-off costs.** Total cash in = £10,000 + a buying commission. Net proceeds = the grown, converted amount, minus a selling commission.
 4. **Tax.** In the **Sheltered** scenario, steps 1–3 are the whole story — no tax is deducted. In the **Taxable** scenario, UK Capital Gains Tax and dividend tax are applied instead — see "Tax scenarios" below for the full method.
 5. **Nominal annual return** = `(net proceeds / total cash in) ^ (1/N) − 1`, per `docs/methodology.md` section 1.2.
@@ -59,7 +59,7 @@ This is done for **every start year the data supports**, per methodology's rolli
 
 **Year-end, not daily.** The methodology asked for "annual average or year-end" rates. This build uses **year-end** (the last available trading-day observation on or before 31 December each year), for two reasons: it's simpler to reason about and check by hand than an average of ~260 daily observations, and it matches how the rest of this company's work already treats annual snapshots (e.g. the standard "month end" publication date). An annual-average approach is left as a documented alternative, not implemented here — it would give slightly different results, especially in years with a sharp FX move.
 
-**Two endpoints, not one rate per year.** Converting once at the start and once at the end of an N-year window gives the mathematically identical cumulative result to converting at every year's own boundary and compounding the ratios (the intermediate rates cancel out: `Π (rate_{t-1}/rate_t) = rate_start/rate_end`). This build takes the simpler two-endpoint route since only the window's overall return is needed, not year-by-year GBP values within it.
+**Two endpoints for the return itself — but per-year for the platform-fee cap.** Converting once at the start and once at the end of an N-year window gives the mathematically identical cumulative result to converting at every year's own boundary and compounding the ratios, **for a pure-percentage cost** (the intermediate rates cancel out: `Π (rate_{t-1}/rate_t) = rate_start/rate_end`). This no longer holds once a cost has an absolute-currency cap, since whether the cap binds in a given year depends on that year's own GBP-converted position, not just the window's endpoints. A skeptic review (2026-09-24) found the previous build's two-endpoint simplification had silently swallowed the AJ Bell platform-fee cap — see "Cost assumptions" below — so this build now converts to GBP every year, purely to evaluate the cap, while the underlying return calculation still only cares about the two endpoints.
 
 ---
 
@@ -67,13 +67,13 @@ This is done for **every start year the data supports**, per methodology's rolli
 
 | Cost | Value | Claim ID | Applied as |
 |---|---|---|---|
-| Illustrative lump sum | £10,000 | — (illustrative, not itself an evidenced fact) | The invested amount. Chosen because it's below AJ Bell's platform-fee cap (see below), so the fee applies at its full stated rate rather than being capped — simpler to explain. A different lump sum would give the same *percentage* return, since every cost here except the flat commissions scales with, or is negligible relative to, the amount invested. |
+| Illustrative lump sum | £10,000 | — (illustrative, not itself an evidenced fact) | The invested amount. **Below the AJ Bell platform-fee cap only at the start, not throughout a compounding window** — see the platform-fee row below and the "Two endpoints" caveat above. Unlike earlier builds' description, a different lump sum would *not* give exactly the same percentage return once the cap can bind, since the cap is a fixed currency amount, not a percentage. |
 | Buying commission | £5.00, one-off | `SP500-0006` | Added to "total cash in" at the start. |
 | Selling commission | £5.00, one-off | `SP500-0006` (same schedule) | Subtracted from proceeds at the end. |
 | Stamp duty / SDRT | 0% | `SP500-0002` | Not applied (genuinely zero for UK-listed ETFs). |
-| Fund OCF | 0.07% p.a. | `SP500-0016` / `SP500-0017` (VUSA/CSPX) | Included in the annual cost drag. |
-| Platform fee | 0.25% p.a., capped at £3.50/month | `SP500-0013` (AJ Bell) | Included in the annual cost drag. At £10,000, 0.25% = £25/year, below the £42/year cap — the cap never binds in this calculation. |
-| **Total annual cost drag** | **0.32% p.a.** | sum of the two rows above | Applied to every year's USD return before FX conversion: `(1 + return) × (1 - 0.0032)`. |
+| Fund OCF | 0.07% p.a. | `SP500-0016` / `SP500-0017` (VUSA/CSPX) | A pure percentage, no cap — applied to the USD position every year, same as before. |
+| Platform fee | 0.25% p.a., **capped at £3.50/month (£42/year)** | `SP500-0013` (AJ Bell) | **Now actually capped, not just documented as capped.** A skeptic review (2026-09-24) found the previous build applied 0.25% uncapped throughout, on the reasoning that £10,000 × 0.25% = £25/year sits below the £42/year cap — true only for the *starting* position. Every window with enough time to compound (in practice, every published 5/10/20yr best-case window) grows past the ~£16,800 threshold where the cap binds; the 2005–2024 20yr window passes it by 2013 and would have been charged £266.63 in the model's last year against a real capped £42. Fixed here: the fee is now evaluated each year against that year's GBP-converted position (`min(0.25% × GBP value, £42)`), which is why the per-year FX conversion in "FX timing and direction" above is now needed. |
+| **Annual cost mechanism** | OCF applied as a pure %; platform fee capped in GBP each year | sum of the two rows above, but no longer a single flat rate | No longer a single `(1 - 0.0032)` multiplier — see `_grow_one_year()` in `build_benchmark.py`. For a position that never crosses the ~£16,800 threshold (short windows, or windows that are losing money), the effective drag is still ≈0.32% p.a., same as before. |
 | ETF bid-ask spread | **£0 (floor) / 0.05% each way (ceiling)** | `SP500-0004` (a labelled sensitivity, not a settled central figure) | The dossier's own central-scenario value for this cost is "not sourced — no central figure is invented." Per methodology section 3's unsourced-cost sensitivity rule, this build shows **both** sides explicitly, applied once on buying and once on selling: `results.csv` and `summary.csv` carry a `_floor` set of columns (spread excluded) and a `_ceiling` set (spread included at 5bps each way), for every window. A skeptic review (2026-09-21) found the first build only computed the floor version, which didn't actually satisfy the rule — fixed here. |
 
 This uses **Route A (ETF)** from `dossiers/sp500.md`, specifically AJ Bell as the platform and VUSA/CSPX as the fund — one internally consistent combination, not a blend across platforms. Route B (open-ended fund) would give a slightly different, also-defensible answer.
@@ -133,18 +133,20 @@ A longer USD-only or GBP-only history exists further back (Damodaran to 1928, Bo
 | Window | Windows | Median | Worst | Best |
 |---|---|---|---|---|
 | 1 year | 37 | +9.65% `SP500-0050` | −30.86% (2002) `SP500-0051` | +39.13% (1989) `SP500-0052` |
-| 5 years | 33 | +10.67% `SP500-0053` | −7.19% (2000–2004) `SP500-0054` | +24.70% (1995–1999) `SP500-0055` |
-| 10 years | 28 | +8.35% `SP500-0056` | −3.18% (2000–2009) `SP500-0057` | +17.08% (1991–2000) `SP500-0058` |
-| 20 years | 18 | +6.25% `SP500-0059` | +4.52% (1999–2018) `SP500-0060` | +9.17% (2005–2024) `SP500-0061` |
+| 5 years | 33 | +10.68% `SP500-0053` | −7.19% (2000–2004) `SP500-0054` | +24.77% (1995–1999) `SP500-0055` |
+| 10 years | 28 | +8.40% `SP500-0056` | −3.18% (2000–2009) `SP500-0057` | +17.19% (1991–2000) `SP500-0058` |
+| 20 years | 18 | +6.38% `SP500-0059` | +4.55% (1999–2018) `SP500-0060` | +9.27% (2005–2024) `SP500-0061` |
 
 **Taxable scenario (basic-rate UK taxpayer), floor spread:**
 
 | Window | Windows | Median | Worst | Best |
 |---|---|---|---|---|
 | 1 year | 37 | +9.65% `SP500-0062` | −30.86% (2002) `SP500-0063` | +36.26% (1989) `SP500-0064` |
-| 5 years | 33 | +9.33% `SP500-0065` | −7.19% (2000–2004) `SP500-0066` | +21.84% (1995–1999) `SP500-0067` |
-| 10 years | 28 | +7.30% `SP500-0068` | −3.18% (2000–2009) `SP500-0069` | +15.31% (1991–2000) `SP500-0070` |
-| 20 years | 18 | +5.51% `SP500-0071` | +3.88% (1999–2018) `SP500-0072` | +8.26% (2005–2024) `SP500-0073` |
+| 5 years | 33 | +9.34% `SP500-0065` | −7.19% (2000–2004) `SP500-0066` | +21.90% (1995–1999) `SP500-0067` |
+| 10 years | 28 | +7.34% `SP500-0068` | −3.18% (2000–2009) `SP500-0069` | +15.42% (1991–2000) `SP500-0070` |
+| 20 years | 18 | +5.63% `SP500-0071` | +3.91% (1999–2018) `SP500-0072` | +8.36% (2005–2024) `SP500-0073` |
+
+**Updated 2026-09-24** (`reviews/benchmark-review-2026-09-24.md`, Finding 1): every number above except the 1-year row shifted slightly upward versus the third build, because the AJ Bell platform-fee cap is now actually applied (see "Cost assumptions"). The 1-year figures are unchanged (a single year never compounds far enough to reach the cap). This is not a new headline claim — the underlying claim IDs (`SP500-0050`–`SP500-0073`) are unchanged; their `value` fields have been updated in `data/evidence/evidence.csv` to match, since every row here is still `status: draft`.
 
 **Ceiling scenario** (ETF bid-ask spread included, 0.05% each way), both tax scenarios: every figure is very slightly worse than its floor equivalent — e.g. the Sheltered 1-year worst window moves from −30.86% to −30.93%. The gap is small because the spread is a one-off cost, not an annual drag, so it matters less the longer the window. See `results.csv`/`summary.csv` for the `_ceiling` columns; not separately logged in the evidence log, since each `SP500-00xx` claim ID above already states both figures.
 
@@ -157,6 +159,8 @@ The median and worst windows are identical between Sheltered and Taxable at seve
 ## What this does not do yet
 
 - The Taxable scenario only models a basic-rate taxpayer, one lump-sum purchase and one disposal, with no interaction with the holder's other income or gains — see "Tax scenarios" above for the full list of what's excluded.
-- The skeptic review that checked this build could not open the binary Damodaran `.xls` file directly (no code-execution tool in that session) — it cross-checked the compounded multi-year result against an independently-fetched total-return series instead (a close match), rather than verifying each individual year's cell value bit-for-bit. Worth a follow-up if anyone wants that last mile of certainty. The new dividend-yield column (used for the Taxable scenario) has not yet had its own independent skeptic check.
-- Doesn't use an annual-average FX alternative to compare against the year-end convention used (the FX convention itself was independently confirmed correct, just not compared against the alternative).
+- ~~The skeptic review that checked this build could not open the binary Damodaran `.xls` file directly~~ — **resolved 2026-09-24**: the second skeptic review had code execution, opened the file directly, refetched all three raw sources live, and reproduced `results.csv`/`summary.csv` byte-for-byte from an unmodified copy of `build_benchmark.py`. The dividend-yield column has now had its own check too (`reviews/benchmark-review-2026-09-24.md` Finding 7 — a latent silent-failure risk was found and fixed, not a live bug).
+- Doesn't use an annual-average FX alternative to compare against the year-end convention used (the FX convention itself was independently confirmed correct — twice now, by two different reviews using different historical cross-checks — just not compared against the annual-average alternative).
 - The Bank of England licence *fact* is now resolved (see "Licence status"), but the resulting policy question — whether to keep building on LSEG/Bloomberg-sourced data long-term — is still open and tracked in `docs/open-research-queue.md`.
+- Methodology's 90% data-coverage rule is written for monthly series; this benchmark's actual mechanism (any missing annual data point excludes the whole window, i.e. 100% or nothing) satisfies it but isn't literally the same rule. Worth a documentation line in `docs/methodology.md` at some point — flagged by `reviews/benchmark-review-2026-09-24.md` Finding 6, not fixed here since it's a methodology-doc change, not a benchmark-code one.
+- Finding 1 of the 2026-09-24 review was only hand-verified against the sheltered/floor scenario; the taxable and ceiling-spread variants use the identical `_grow_one_year()` mechanism so should carry the same fix correctly, but haven't been separately hand-checked line by line.

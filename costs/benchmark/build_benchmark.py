@@ -43,8 +43,15 @@ ILLUSTRATIVE_LUMP_SUM_GBP = 10_000.0
 BUY_COMMISSION_GBP = 5.00        # SP500-0006, AJ Bell, central
 SELL_COMMISSION_GBP = 5.00       # SP500-0006, AJ Bell, central (same schedule)
 ANNUAL_OCF_RATE = 0.0007         # SP500-0016/0017, VUSA/CSPX, central, 0.07% p.a.
-ANNUAL_PLATFORM_FEE_RATE = 0.0025  # SP500-0013, AJ Bell, central, 0.25% p.a. (cap not reached at this lump sum)
-ANNUAL_COST_DRAG = ANNUAL_OCF_RATE + ANNUAL_PLATFORM_FEE_RATE  # 0.0032
+ANNUAL_PLATFORM_FEE_RATE = 0.0025  # SP500-0013, AJ Bell, central, 0.25% p.a. of the
+                                    # position's GBP value each year, capped below.
+PLATFORM_FEE_CAP_GBP = 42.00       # SP500-0013, AJ Bell, "£3.50 per month" x 12.
+                                    # Binds once the GBP position passes ~£16,800 —
+                                    # a skeptic review (2026-09-24) found this is
+                                    # reached by every long, well-performing window
+                                    # (e.g. the 2005-2024 20yr window passes it by
+                                    # 2013), so it is applied per year below, not
+                                    # assumed away as it was in the previous build.
 
 # SP500-0004: the ETF bid-ask spread, a labelled sensitivity with no real source.
 # "Floor" = excluded (£0). "Ceiling" = the dossier's own stated 0.05% (5bps) upper
@@ -138,11 +145,32 @@ def load_ons_december_cpi(csv_path):
     return cpi
 
 
-def _sheltered_scenario(usd_growth, rate_start, rate_end, spread_rate):
+def _grow_one_year(value_usd, year, damodaran, fx):
+    """Apply one year's total return, fund OCF (a pure %, never capped) and AJ Bell's
+    platform fee (0.25% of the GBP-converted position, capped at £42/year — SP500-0013)
+    to a USD-tracked position. Returns the new value_usd.
+
+    The platform fee has to be evaluated in GBP, on that year's own FX rate, because the
+    cap is a fixed currency amount, not a percentage — a skeptic review (2026-09-24)
+    found the previous build applied 0.25% uncapped throughout, which is only true for
+    the *starting* position: every window with enough time to compound past roughly
+    £16,800 (in practice, every published 5/10/20yr best-case window) should have hit
+    the cap and didn't. See reviews/benchmark-review-2026-09-24.md Finding 1.
+    """
+    value_usd = value_usd * (1 + damodaran[year]) * (1 - ANNUAL_OCF_RATE)
+    gbp_value = value_usd * fx[year]
+    platform_fee_gbp = min(ANNUAL_PLATFORM_FEE_RATE * gbp_value, PLATFORM_FEE_CAP_GBP)
+    gbp_value -= platform_fee_gbp
+    return gbp_value / fx[year]
+
+
+def _sheltered_scenario(start_year, end_year, damodaran, fx, spread_rate):
     """No tax deducted — an ISA/SIPP holding. Returns (total_cash_in, net_proceeds)."""
-    invested_usd = ILLUSTRATIVE_LUMP_SUM_GBP / rate_start
-    grown_usd = invested_usd * usd_growth
-    grown_gbp = grown_usd * rate_end
+    rate_start = fx[start_year - 1]
+    value_usd = ILLUSTRATIVE_LUMP_SUM_GBP / rate_start
+    for y in range(start_year, end_year + 1):
+        value_usd = _grow_one_year(value_usd, y, damodaran, fx)
+    grown_gbp = value_usd * fx[end_year]
 
     total_cash_in = ILLUSTRATIVE_LUMP_SUM_GBP * (1 + spread_rate) + BUY_COMMISSION_GBP
     net_proceeds = grown_gbp * (1 - spread_rate) - SELL_COMMISSION_GBP
@@ -173,12 +201,17 @@ def _taxable_scenario(start_year, end_year, damodaran, yields, fx, spread_rate):
     cumulative_cost_basis_addition_gbp = 0.0
 
     for y in range(start_year, end_year + 1):
-        dividend_yield_y = yields.get(y, 0.0)
+        # No silent default here (a skeptic review, 2026-09-24, flagged the previous
+        # yields.get(y, 0.0) as a latent silent-failure risk): compute_window's own
+        # coverage check already guarantees y is in yields before this runs, so a
+        # missing year should raise loudly, not quietly understate dividend tax.
+        dividend_yield_y = yields[y]
         notional_dividend_usd = value_usd * dividend_yield_y
 
         # Grow the whole position (price + reinvested dividend), net of ongoing costs —
         # the fund itself reinvests automatically; only the tax treatment is separate.
-        value_usd = value_usd * (1 + damodaran[y]) * (1 - ANNUAL_COST_DRAG)
+        # Same OCF + capped-platform-fee mechanism as the sheltered scenario.
+        value_usd = _grow_one_year(value_usd, y, damodaran, fx)
 
         # The notional distribution is taxed as income in the year it arises, converted
         # to GBP at that year's own year-end rate (a real, dated conversion, not the
@@ -214,14 +247,12 @@ def compute_window(start_year, length, damodaran, yields, fx, cpi):
 
     if any(y not in damodaran for y in years_needed):
         return None
+    if any(y not in yields for y in years_needed):
+        return None
     if (start_year - 1) not in fx or any(y not in fx for y in years_needed):
         return None
     if (start_year - 1) not in cpi or end_year not in cpi:
         return None
-
-    usd_growth = 1.0
-    for y in years_needed:
-        usd_growth *= (1 + damodaran[y]) * (1 - ANNUAL_COST_DRAG)
 
     rate_start = fx[start_year - 1]
     rate_end = fx[end_year]
@@ -241,7 +272,7 @@ def compute_window(start_year, length, damodaran, yields, fx, cpi):
 
     for spread_label, spread_rate in (("floor", 0.0), ("ceiling", SPREAD_CEILING_RATE)):
         sheltered_cash_in, sheltered_proceeds = _sheltered_scenario(
-            usd_growth, rate_start, rate_end, spread_rate
+            start_year, end_year, damodaran, fx, spread_rate
         )
         sheltered_nominal = (sheltered_proceeds / sheltered_cash_in) ** (1 / length) - 1
         sheltered_real = (1 + sheltered_nominal) / (1 + avg_annual_inflation) - 1
